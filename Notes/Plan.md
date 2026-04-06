@@ -8,9 +8,9 @@ A bot that:
 - handles slash commands through the Discord Interactions HTTP endpoint
 - tracks per-user music posting streaks separately for each monitored channel
 - posts a separate scheduled leaderboard in each channel designated as a leaderboard channel
-- monitored channels and leaderboard channels are configured independently; a monitored channel links to the leaderboard channel where its stats are displayed
+- monitored channels and leaderboard channels are configured independently, but each leaderboard channel is linked to exactly one monitored channel, so stats remain channel-scoped and are never merged across channels
 
-The implementation uses Red/Green TDD throughout.
+The implementation uses strong Red/Green TDD for business logic, persistence, recovery, and idempotency. Thin transport glue may use lighter integration-focused tests where that is more effective than exhaustive unit tests.
 
 **Runtime**: Bun
 **Database**: better-sqlite3
@@ -21,9 +21,12 @@ The implementation uses Red/Green TDD throughout.
 
 ## DB Access Pattern
 
-Every database operation follows the same retry and `Result` pattern. The `Database` type is `BetterSqlite3.Database` from `better-sqlite3`. Since better-sqlite3 is synchronous, `toResult` wraps synchronous calls.
+Every database operation follows the same `Result` pattern. Exported DB functions may use a small synchronous retry wrapper, but retries are restricted to known transient SQLite lock conditions only. The `Database` type is `BetterSqlite3.Database` from `better-sqlite3`. Since better-sqlite3 is synchronous, `toResult` wraps synchronous calls.
 
 ```typescript
+const isTransientSqliteError = (error: Error): boolean =>
+  error.message.includes('SQLITE_BUSY') || error.message.includes('SQLITE_LOCKED')
+
 const withRetry = <T>(
   operationName: string,
   operation: () => Result<T, Error>
@@ -38,6 +41,11 @@ const withRetry = <T>(
     }
 
     lastError = result.error
+
+    if (!isTransientSqliteError(lastError)) {
+      return result
+    }
+
     console.warn(`${operationName} attempt ${attempt + 1} failed`, lastError)
   }
 
@@ -76,10 +84,12 @@ const getUserStatsActual = (
 
 **Key rules:**
 - `withRetry` wraps every exported DB function.
-- `withRetry` retries when the inner function returns `Result.err`.
+- `withRetry` retries only when the inner function returns `Result.err` for known transient SQLite lock conditions (`SQLITE_BUSY`, `SQLITE_LOCKED`).
+- Non-transient DB errors are returned immediately without retry.
 - `toResult` is used inside each private `*Actual` function to normalize thrown exceptions.
 - `*Actual` functions are never exported.
 - Prefer explicit `INSERT ... ON CONFLICT ... DO UPDATE` statements over `INSERT OR REPLACE`.
+- Tables with `updated_at` must set `updated_at = CURRENT_TIMESTAMP` explicitly inside their UPSERT `DO UPDATE` clause.
 - `Result` comes from `true-myth/result`.
 - All DB operations are synchronous (better-sqlite3). Return types are `Result<T, Error>`, not `Promise<Result<T, Error>>`.
 
@@ -129,14 +139,17 @@ Work through these phases in order. Each step: write the failing test first, the
   - Discord: `discord.js`
   - DB: `better-sqlite3`, `@types/better-sqlite3`
   - Result: `true-myth`
-  - Retry: `async-retry`, `@types/async-retry`
   - Testing: `vitest`
   - Types: `typescript`
 - [ ] **0.2** Configure `tsconfig.json` with strict mode and bundler module resolution
 - [ ] **0.3** Configure `vitest.config.ts`
   - Each test suite creates its own in-memory better-sqlite3 database via `new Database(':memory:')` and applies `schema.sql` in a `beforeEach` or `beforeAll` hook
 - [ ] **0.4** Create `src/db/schema.sql` with `user_stats`, `leaderboard_channels`, `leaderboard_posts`, `recovery_state`, `monitored_channels`, and `processed_messages`
-- [ ] **0.5** Apply schema to local file-based database for manual testing
+  - Enable relational integrity with `PRAGMA foreign_keys = ON`
+  - Add a foreign key from `monitored_channels.leaderboard_channel_id` to `leaderboard_channels.channel_id`
+  - Enforce one monitored channel per leaderboard channel
+  - Add indexes required for prune and lookup hot paths (`processed_messages.processed_at`; rely on the `UNIQUE` constraint index for `monitored_channels.leaderboard_channel_id`)
+- [ ] **0.5** Apply schema to local file-based database for manual testing and verify `PRAGMA foreign_keys = ON` is enabled on the connection
 - [ ] **0.6** Create `src/constants.ts` with `MUSIC_EXTENSIONS`, `EIGHT_HOURS_SECS`, `THIRTY_SIX_HOURS_SECS`, `LEADERBOARD_MAX_ROWS`, `ADMINISTRATOR_PERMISSION`, `STANDARD_RETRY_OPTIONS`, and `ACCEPTED_MESSAGE_TYPES`
 - [ ] **0.7** Create `src/types.ts` with the shared interfaces in the Types section below
 
@@ -149,11 +162,13 @@ Work through these phases in order. Each step: write the failing test first, the
   - RED: test fractional seconds and timezone normalization edge cases
   - GREEN: implement `parseDiscordTimestamp(iso: string): number`
   - RED: test `computeStreakDelta(null)` returns `'first'`
+  - RED: test `computeStreakDelta(delta)` clamps negative deltas to `0` before classification
   - RED: test `computeStreakDelta(delta)` where `delta <= 8h` returns `'noop'`
   - RED: test `computeStreakDelta(delta)` where `8h < delta <= 36h` returns `'increment'`
   - RED: test `computeStreakDelta(delta)` where `delta > 36h` returns `'reset'`
   - GREEN: implement `computeStreakDelta(deltaSecs: number | null): StreakDeltaKind`
     - `null` → `'first'`
+    - negative deltas are clamped to `0`
     - `<= 28_800` → `'noop'`
     - `<= 129_600` → `'increment'`
     - `> 129_600` → `'reset'`
@@ -172,7 +187,9 @@ Work through these phases in order. Each step: write the failing test first, the
 - [ ] **1.4 — `utils/db-helpers.ts`**
   - RED: test `toResult` returns `Result.ok(value)` on success
   - RED: test `toResult` returns `Result.err(Error)` when the callback throws
-  - RED: test `withRetry` retries when the inner operation returns `Result.err`
+  - RED: test `withRetry` retries when the inner operation returns `Result.err` for `SQLITE_BUSY`
+  - RED: test `withRetry` retries when the inner operation returns `Result.err` for `SQLITE_LOCKED`
+  - RED: test `withRetry` does **not** retry non-transient errors
   - RED: test `withRetry` returns immediately on success without retrying
   - GREEN: implement `toResult<T>` and `withRetry<T>` (synchronous — no async needed for better-sqlite3)
 
@@ -190,7 +207,8 @@ All exported functions follow the `fn` / `fnActual` pattern. `Database` (`Better
 - [ ] **2.2 — `upsertUserStats`**
   - RED: test inserts a new row when no record exists
   - RED: test updates an existing row using explicit UPSERT semantics
-  - RED: test preserves `updated_at` behavior expected by the schema
+  - RED: test sets `updated_at` on insert
+  - RED: test refreshes `updated_at` on update
   - GREEN: implement `upsertUserStats(db, stats): Result<void, Error>` with `INSERT ... ON CONFLICT(channel_id, user_id) DO UPDATE`
 
 - [ ] **2.3 — `getLeaderboard`**
@@ -217,14 +235,17 @@ All exported functions follow the `fn` / `fnActual` pattern. `Database` (`Better
 - [ ] **2.6 — `getRecoveryState` / `upsertRecoveryState`**
   - RED: test returns `null` for an unknown channel
   - RED: test round-trips `last_processed_message_id`
+  - RED: test `updated_at` is set on insert and refreshed on update
   - GREEN: implement both using explicit UPSERT syntax
 
-- [ ] **2.7 — `getMonitoredChannels` / `addMonitoredChannel` / `deleteMonitoredChannel` / `isMonitoredChannel` / `getMonitoredChannelsByLeaderboard`**
+- [ ] **2.7 — `getMonitoredChannels` / `addMonitoredChannel` / `deleteMonitoredChannel` / `isMonitoredChannel` / `getMonitoredChannelByLeaderboard`**
   - RED: test monitored channels are empty initially
   - RED: test adding a monitored channel with a `leaderboardChannelId` inserts a row
   - RED: test adding the same channel again is idempotent
+  - RED: test adding a different monitored channel to a leaderboard channel that is already linked is rejected
   - RED: test deleting the channel removes it
-  - RED: test `getMonitoredChannelsByLeaderboard` returns only channels linked to a given leaderboard channel
+  - RED: test `getMonitoredChannelByLeaderboard` returns `null` when a leaderboard channel has no linked monitored channel
+  - RED: test `getMonitoredChannelByLeaderboard` returns the linked monitored channel for a given leaderboard channel
   - GREEN: implement all five functions
 
 - [ ] **2.8 — `claimProcessedMessage` / `hasProcessedMessage` / `pruneProcessedMessages`**
@@ -244,6 +265,7 @@ The tracker contains pure business logic. It takes the current `UserStats | null
 - [ ] **3.1 — `computeNewStats`**
   - RED: test first-ever post sets `runCount = 1` and `highestRunSeen = 1`
   - RED: test delta `<= 8h` leaves `runCount` unchanged and updates `lastMusicPostAt`
+  - RED: test negative deltas are clamped to `0`, leave `runCount` unchanged, and preserve the newer of the two timestamps as `lastMusicPostAt`
   - RED: test `8h < delta <= 36h` increments `runCount`
   - RED: test `highestRunSeen` updates whenever the new active streak exceeds the prior best
   - RED: test `delta > 36h` resets `runCount` to `1` (the new post itself starts a fresh streak)
@@ -271,18 +293,26 @@ The tracker contains pure business logic. It takes the current `UserStats | null
 
 ### Phase 4 — Shared Message Processor (`services/processor.ts`)
 
-This service is the single authoritative path for message ingestion used by both the gateway handler and recovery. It accepts only `DEFAULT` (type 0) and `REPLY` (type 19) messages; all other message types are ignored.
+This service is the single authoritative path for message ingestion used by both the gateway handler and recovery. It accepts a small internal normalized message shape so the gateway path and recovery path adapt their source payloads before processing. Only `DEFAULT` (type 0) and `REPLY` (type 19) messages are accepted; all other message types are ignored.
 
-- [ ] **4.1 — `processMessage`**
+- [ ] **4.1 — Message normalization**
+  - RED: test gateway `discord.js` messages are normalized into the internal message shape used by `processMessage`
+  - RED: test recovery REST payloads are normalized into the same internal message shape
+  - RED: test both adapters preserve the fields used by streak logic and attachment detection
+  - GREEN: implement normalization helpers for gateway and recovery inputs
+
+- [ ] **4.2 — `processMessage`**
   - RED: test ignores a message from a non-monitored channel
   - RED: test ignores a message with no supported music attachment
   - RED: test ignores bot messages (`author.bot === true`)
   - RED: test ignores messages with types not in `ACCEPTED_MESSAGE_TYPES` (only `DEFAULT = 0` and `REPLY = 19` are accepted)
   - RED: test claims a message ID before mutating stats
+  - RED: test performs claim + stats mutation in a single transaction
+  - RED: test rolls back the claim when stats mutation fails inside the transaction
   - RED: test skips processing when the message ID is already claimed
   - RED: test processes a valid music message by reading stats, computing new stats, and upserting stats
-  - RED: test advances `recovery_state.last_processed_message_id` only after successful processing
-  - RED: test returns `Result.err` on DB failure but does not advance `recovery_state`
+  - RED: test does **not** advance `recovery_state`
+  - RED: test returns `Result.err` on DB failure without leaving a partially claimed message behind
   - GREEN: implement `processMessage(db, message): Result<boolean, Error>`
     - Returns `Result.ok(true)` when the message was processed
     - Returns `Result.ok(false)` when the message was skipped (filtered or already claimed)
@@ -296,13 +326,14 @@ This service is the single authoritative path for message ingestion used by both
   - RED: test returns a formatted header using the provided channel display name
   - RED: test returns a "no data" message for an empty leaderboard
   - RED: test ranks start at 1 and increment correctly
+  - RED: test usernames containing pipes, backticks, and long display names are escaped or normalized safely in the rendered output
   - RED: test formatted content remains below Discord's message length limit for the maximum row count
   - GREEN: implement `formatLeaderboard(channelName: string, rows: LeaderboardRow[]): string`
 
 - [ ] **5.2 — `hashContent`**
   - RED: test produces a consistent hex digest for the same input
   - RED: test produces different digests for different inputs
-  - GREEN: implement `hashContent(content: string): string` using FNV-1a (fast, non-cryptographic, good collision resistance for this use case)
+  - GREEN: implement `hashContent(content: string): string` using FNV-1a (fast, non-cryptographic, sufficient for lightweight change detection)
 
 ---
 
@@ -314,6 +345,8 @@ Uses `fetch` directly. Tests use request interception. All requests go through a
 - Maintain a minimum delay of **1 100 ms** between consecutive Discord API requests (stays well within 5 requests / 5 seconds).
 - On a `429` response, read the `Retry-After` header (seconds), wait that duration, then retry the request once.
 - On a second consecutive `429`, return `Result.err` and let the caller decide.
+
+This is an intentionally simple v1 strategy. If the bot grows, it may need per-route or bucket-aware rate-limit handling later.
 
 - [ ] **6.1 — `discordFetch` (internal helper)**
   - RED: test enforces minimum delay between consecutive calls
@@ -355,6 +388,7 @@ Uses `fetch` directly. Tests use request interception. All requests go through a
   - RED: test begins from `after=0` when `last_processed_message_id` is `null` (fetches from the very beginning of the channel)
   - RED: test sorts each fetched batch from oldest to newest before processing
   - RED: test skips already processed message IDs safely
+  - RED: test advances `recovery_state.last_processed_message_id` only inside recovery orchestration, after successful processing
   - RED: test updates `recovery_state` with the highest successfully processed message ID
   - RED: test does not advance the checkpoint beyond a failed message
   - RED: test loops through multiple pages until caught up
@@ -371,10 +405,12 @@ Uses `fetch` directly. Tests use request interception. All requests go through a
 The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection, session resume). This handler only needs to listen for events on the `discord.js` `Client`.
 
 - [ ] **8.1 — Gateway event dispatch**
-  - RED: test `messageCreate` events are routed to `processMessage`
+  - RED: test `messageCreate` events are normalized and routed to `processMessage`
   - RED: test bot messages are ignored before reaching `processMessage`
+  - RED: test gateway processing does **not** advance `recovery_state`
   - GREEN: implement `setupGatewayHandler(client, db)`
     - Listens on the `discord.js` `client.on('messageCreate', ...)` event
+    - Normalizes the gateway message into the internal message shape
     - Calls `processMessage(db, message)` and logs errors on `Result.err` (fire-and-forget; recovery will retry later)
 
 ---
@@ -396,14 +432,19 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
   - RED: test when a channel option is provided, uses that channel ID as the target
   - RED: test returns an error if the target channel is not in `leaderboard_channels`
   - RED: test resolves the channel display name: from `interaction.channel.name` for the current channel, via `fetchChannel` for a different channel
-  - RED: test queries `getMonitoredChannelsByLeaderboard` to find all monitored channels for the target, then queries `getLeaderboard` for each and merges rows
+  - RED: test queries `getMonitoredChannelByLeaderboard` to find the single monitored channel linked to the target leaderboard channel
+  - RED: test queries `getLeaderboard` only for that linked monitored channel and does not merge rows across channels
   - RED: test passes the channel display name into `formatLeaderboard`
   - RED: test returns an ephemeral response
-  - RED: test returns a "no data" message when no monitored channels have stats
+  - RED: test returns a helpful response when the leaderboard channel has no linked monitored channel
+  - RED: test returns a "no data" message when the linked monitored channel has no stats
+  - RED: test returns an error when `fetchChannel` fails for a provided channel option
   - GREEN: implement `/leaderboard`
 
 - [ ] **9.4 — `/setleaderboardchannel`**
   - Takes no arguments; operates on the current channel.
+  - RED: test rejects interactions missing `member` or `member.permissions`
+  - RED: test rejects interactions invoked outside a guild context
   - RED: test rejects a user without the `ADMINISTRATOR` permission (BigInt check)
   - RED: test accepts a user with the `ADMINISTRATOR` permission
   - RED: test upserts the current channel into `leaderboard_channels`
@@ -413,6 +454,8 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
 
 - [ ] **9.5 — `/removeleaderboardchannel`**
   - Takes no arguments; operates on the current channel.
+  - RED: test rejects interactions missing `member` or `member.permissions`
+  - RED: test rejects interactions invoked outside a guild context
   - RED: test rejects a user without the `ADMINISTRATOR` permission
   - RED: test removes the current channel from `leaderboard_channels`
   - RED: test removes all `monitored_channels` rows that reference this leaderboard channel
@@ -422,14 +465,19 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
 
 - [ ] **9.6 — `/addmonitoredchannel <channel>`**
   - Takes one required argument: the channel to monitor.
+  - RED: test rejects interactions missing `member` or `member.permissions`
+  - RED: test rejects interactions invoked outside guild context
   - RED: test rejects a user without the `ADMINISTRATOR` permission
   - RED: test rejects if the current channel is not in `leaderboard_channels` (the admin must first set a leaderboard channel, then run this command from that leaderboard channel to link a monitored channel)
   - RED: test adds the provided channel to `monitored_channels` with `leaderboard_channel_id` set to the current channel
   - RED: test is idempotent (adding the same channel again does not error)
+  - RED: test rejects linking a different monitored channel when the current leaderboard channel already has one linked monitored channel
   - GREEN: implement `/addmonitoredchannel`
 
 - [ ] **9.7 — `/removemonitoredchannel <channel>`**
   - Takes one required argument: the channel to stop monitoring.
+  - RED: test rejects interactions missing `member` or `member.permissions`
+  - RED: test rejects interactions invoked outside guild context
   - RED: test rejects a user without the `ADMINISTRATOR` permission
   - RED: test removes the provided channel from `monitored_channels`
   - RED: test does not delete historical `user_stats`, `recovery_state`, or `processed_messages` rows
@@ -448,7 +496,9 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
   - RED: test `pruneProcessedMessages` runs after leaderboard posting (deletes rows older than 14 days)
   - RED: test does nothing when there are no configured leaderboard channels
   - RED: test processes each leaderboard channel independently
-  - RED: test for each leaderboard channel, queries all linked monitored channels, merges leaderboard rows, and formats using the stored `channel_name`
+  - RED: test for each leaderboard channel, queries the single linked monitored channel and formats only that channel's stats using the stored `channel_name`
+  - RED: test does not merge rows across different monitored channels
+  - RED: test removes any previously stored leaderboard post when a leaderboard channel no longer has a linked monitored channel
   - RED: test computes a content hash (FNV-1a) per channel and skips unchanged content
   - RED: test deletes the previous leaderboard message when one exists
   - RED: test continues gracefully when message deletion returns `404`
@@ -460,13 +510,15 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
 ### Phase 11 — Entry Point (`src/index.ts`)
 
 - [ ] **11.1** Create the `discord.js` `Client` with required intents: `Guilds`, `GuildMessages`, `MessageContent`
-- [ ] **11.2** Initialise the better-sqlite3 database from a file path (environment variable `DATABASE_PATH`), apply `schema.sql` if tables don't exist
+- [ ] **11.2** Initialise the better-sqlite3 database from a file path (environment variable `DATABASE_PATH`), enable `PRAGMA foreign_keys = ON`, and apply `schema.sql` if tables don't exist
 - [ ] **11.3** Wire the gateway handler: `setupGatewayHandler(client, db)`
 - [ ] **11.4** Wire the HTTP `fetch` handler (separate HTTP server or express-like listener):
   - `POST /interactions` → signature verification → interaction router
-- [ ] **11.5** Set up a `setInterval` (or `node-cron`) timer for hourly scheduled work that calls `runScheduledWork(db, token)`
-- [ ] **11.6** Call `client.login(DISCORD_BOT_TOKEN)` to start the gateway connection
-- [ ] **11.7** Add an integration smoke test that simulates a `messageCreate` event on the client and verifies a DB row is created
+- [ ] **11.5** Run one recovery pass shortly after startup so the bot does not remain stale until the first hourly interval
+- [ ] **11.6** Set up a `setInterval` (or `node-cron`) timer for hourly scheduled work that calls `runScheduledWork(db, token)`
+- [ ] **11.7** Call `client.login(DISCORD_BOT_TOKEN)` to start the gateway connection
+- [ ] **11.8** Add an integration smoke test that simulates a `messageCreate` event on the client and verifies a DB row is created
+- [ ] **11.9** Add a startup integration test proving that the initial recovery pass runs before the first scheduled interval elapses
 
 ---
 
@@ -618,6 +670,33 @@ export interface DiscordAttachment {
   readonly content_type?: string
 }
 
+export interface NormalizedAttachment {
+  readonly filename?: string
+  readonly contentType?: string
+}
+
+export interface NormalizedAuthor {
+  readonly id: string
+  readonly username: string
+  readonly globalName: string | null
+  readonly isBot: boolean
+}
+
+export interface NormalizedMember {
+  readonly nick: string | null
+}
+
+export interface NormalizedMessage {
+  readonly id: string
+  readonly channelId: string
+  readonly guildId?: string
+  readonly author: NormalizedAuthor
+  readonly member?: NormalizedMember
+  readonly timestamp: string
+  readonly attachments: readonly NormalizedAttachment[]
+  readonly type: number
+}
+
 export interface DiscordMessage {
   readonly id: string
   readonly channel_id: string
@@ -667,6 +746,8 @@ export interface Env {
 ## Schema Reference (`src/db/schema.sql`)
 
 ```sql
+PRAGMA foreign_keys = ON;
+
 CREATE TABLE IF NOT EXISTS user_stats (
     channel_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
@@ -703,7 +784,7 @@ CREATE TABLE IF NOT EXISTS recovery_state (
 CREATE TABLE IF NOT EXISTS monitored_channels (
     channel_id TEXT PRIMARY KEY,
     guild_id TEXT NOT NULL,
-    leaderboard_channel_id TEXT NOT NULL,
+    leaderboard_channel_id TEXT NOT NULL UNIQUE REFERENCES leaderboard_channels(channel_id) ON DELETE CASCADE,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -712,7 +793,12 @@ CREATE TABLE IF NOT EXISTS processed_messages (
     channel_id TEXT NOT NULL,
     processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_processed_messages_processed_at
+    ON processed_messages(processed_at);
 ```
+
+`updated_at` columns are refreshed by explicit UPSERT statements in query code rather than by schema-level triggers.
 
 ---
 
@@ -734,6 +820,8 @@ export const PRUNE_THRESHOLD_DAYS = 14
 
 export const DISCORD_API_DELAY_MS = 1_100
 
+export const SQLITE_TRANSIENT_ERROR_MESSAGES = ['SQLITE_BUSY', 'SQLITE_LOCKED'] as const
+
 export const STANDARD_RETRY_OPTIONS = {
   retries: 3,
 } as const
@@ -745,24 +833,30 @@ export const STANDARD_RETRY_OPTIONS = {
 
 - `runCount` resets to `1` when a post arrives more than 36 hours after the previous tracked post (the new post itself starts a fresh streak).
 - `highestRunSeen` is updated whenever the active streak exceeds the previous best streak.
-- Leaderboard channels and monitored channels are configured independently. A monitored channel has a `leaderboard_channel_id` foreign key linking it to the leaderboard channel where its stats are displayed.
+- Negative deltas are clamped to `0` for streak classification; when timestamps arrive out of order, the newer timestamp remains the source of truth for `lastMusicPostAt`.
+- Leaderboard channels and monitored channels are configured independently, but each leaderboard channel is linked to exactly one monitored channel. Stats remain channel-scoped and are never merged across channels.
 - `/setleaderboardchannel` designates the current channel as a leaderboard posting target. It does **not** add it to `monitored_channels`.
-- `/addmonitoredchannel <channel>` is run from a leaderboard channel. It adds the specified channel to `monitored_channels` and links it to the current leaderboard channel.
+- `/addmonitoredchannel <channel>` is run from a leaderboard channel. It adds the specified channel to `monitored_channels` and links it to the current leaderboard channel. A leaderboard channel may have only one linked monitored channel.
 - `/removeleaderboardchannel` removes the current channel from `leaderboard_channels` and also removes all `monitored_channels` rows that reference it.
 - `/removemonitoredchannel <channel>` removes the specified channel from `monitored_channels` without affecting the leaderboard channel.
 - Removing a leaderboard or monitored channel stops future tracking and posting but preserves historical `user_stats`, `recovery_state`, and `processed_messages` rows.
 - Scheduled leaderboard formatting uses the `channel_name` stored in `leaderboard_channels`, refreshed by `/setleaderboardchannel`.
 - Each leaderboard channel is tracked independently, with its own post record and content hash.
-- The `/leaderboard` command verifies the target channel is in `leaderboard_channels`, then queries all linked monitored channels and merges their leaderboard rows.
+- The `/leaderboard` command verifies the target channel is in `leaderboard_channels`, resolves the single linked monitored channel, and renders only that channel's stats.
 - Recovery always processes messages from oldest to newest inside each fetched batch. The checkpoint ID is **excluded** from the fetch (Discord's `after` parameter is exclusive).
 - When `last_processed_message_id` is `null`, recovery starts from `after=0` to fetch from the beginning of the channel.
 - Message IDs are stored in `processed_messages` so gateway and recovery paths remain idempotent. Rows older than 14 days are pruned during scheduled work.
+- `processMessage` performs message claim + stats mutation in a single transaction and does **not** advance `recovery_state`; recovery owns checkpoint advancement.
 - The gateway handler logs and swallows `processMessage` errors. Recovery will retry failed messages later.
-- The Discord API client enforces a minimum 1 100 ms delay between requests and respects `429` / `Retry-After` headers.
+- The gateway and recovery paths normalize their source payloads into one internal message shape before calling `processMessage`.
+- The Discord API client enforces a minimum 1 100 ms delay between requests and respects `429` / `Retry-After` headers. This is an intentionally simple v1 approach and may need per-route or bucket-aware handling later.
 - Use explicit UPSERT statements with `ON CONFLICT` instead of `INSERT OR REPLACE`.
+- `updated_at` is set on insert and refreshed explicitly on update for the tables that expose it, by setting `updated_at = CURRENT_TIMESTAMP` in the UPSERT `DO UPDATE` clause.
+- `withRetry` retries only transient SQLite lock errors (`SQLITE_BUSY`, `SQLITE_LOCKED`); non-transient errors return immediately.
+- Leaderboard formatting escapes or normalizes usernames so markdown/table formatting cannot be broken by display names.
 - All `*Actual` DB functions are module-private; only their retry-wrapped counterparts are exported.
 - Only `DEFAULT` (type 0) and `REPLY` (type 19) messages are processed; all other message types are ignored.
 - `discord.js` manages the gateway lifecycle (heartbeat, reconnection, session resume).
 - Permission checks parse the permissions string to `BigInt` and test with bitwise AND against `ADMINISTRATOR_PERMISSION` (`0x8n`).
 - `hasMusicAttachment` checks file extension first; if `filename` is absent, falls back to checking `content_type` starts with `audio/`.
-- `async-retry` is not used. Since better-sqlite3 is synchronous, the `withRetry` helper uses a simple synchronous retry loop.
+- One recovery pass runs shortly after startup so the bot does not remain stale until the first scheduled interval.

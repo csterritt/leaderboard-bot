@@ -1,122 +1,282 @@
-# Plan Review — Discord Music Leaderboard Bot
+# Plan Review
 
 ## Overall Assessment
 
-The plan is well-structured, thorough, and closely aligned with the architecture document. The phased approach with Red/Green TDD, bottom-up layering (utilities → DB → services → handlers → entry point), and the explicit types reference make this a strong implementation guide. The items below are corrections, gaps, and suggestions — not a rewrite.
+This is a strong plan overall. It is structured, internally consistent with the architecture document, and it makes several good design choices up front:
 
----
+- separating gateway ingestion from interaction handling
+- using a shared `processMessage` path for gateway and recovery
+- treating idempotency as a first-class concern
+- keeping configuration explicit through `leaderboard_channels` and `monitored_channels`
+- planning the work in a phased order that is mostly sensible
 
-## Correctness Issues
+The plan is good enough to implement from, but I do **not** think it is fully correct as written. There are a few important correctness risks that should be fixed before implementation starts, especially around recovery checkpoints, transactional idempotency, and leaderboard aggregation across multiple monitored channels.
 
-### 1. Streak reset sets `runCount` to 0, but the architecture says the first post after a reset should count
+## What Is Good About the Plan
 
-The architecture's tracking logic (section 4) shows that when `Delta > 36 hours`, `runCount = 0`. But then `lastMusicPostAt` is updated to the current timestamp. This means the user posted music, yet their run is 0 — they don't get credit for the post that just happened. A reset should almost certainly set `runCount` back to **1**, not 0, since the new post itself begins a fresh streak. The plan's test in **3.1** says "test `delta > 36h` resets `runCount` to `0`", which faithfully mirrors the architecture, but both documents likely have this wrong. Verify the intended behavior: if a user posts after a 2-day gap, should they show a run of 0 or 1?
+### 1. The architecture and implementation plan align well
 
-### 2. `computeStreakDelta` receives `deltaSecs` but the first-post case has no delta
+The plan tracks the architecture document closely. The main components, schema, command set, and scheduled workflow are all consistent. That reduces ambiguity for implementation.
 
-`computeStreakDelta(deltaSecs: number)` returns `'first'`, but the caller must handle `lastMusicPostAt === null` *before* computing a delta. A `number` input can't represent "no prior post". Either:
-- Change the signature to `computeStreakDelta(deltaSecs: number | null)` where `null` → `'first'`.
-- Or make the caller responsible for the `null` check and never pass `null` to this function.
+### 2. The shared processor is the right idea
 
-The plan doesn't clarify which approach to use, and the tests in **1.1** test `'first'` as a return value of `computeStreakDelta` without specifying what input produces it. This should be pinned down before implementation.
+Using one authoritative message-processing path for both gateway events and recovery is a very good design choice. It reduces drift, avoids duplicate business logic, and makes correctness easier to reason about.
 
-### 3. Recovery start state when `last_processed_message_id` is null
+### 3. The plan takes failure and idempotency seriously
 
-Test **7.1** says "test begins from the start state when `last_processed_message_id` is `null`", but the Discord `GET /channels/{id}/messages?after={id}` endpoint requires an `after` parameter. If there's no checkpoint, what value is used? Snowflake `0`? Omit `after` entirely and use a different query parameter? The plan should specify the bootstrap behavior explicitly. Using `after=0` would fetch from the beginning of the channel, which is likely correct but should be stated.
+The inclusion of `processed_messages`, `recovery_state`, and the recovery pass is a good sign. This is the right problem to focus on for a bot that receives data from both live gateway events and backfill.
 
-### 4. `DiscordMember.permissions` is only present on interaction payloads
+### 4. The command model is understandable
 
-The `DiscordMember` interface has a `permissions` field, but in `MESSAGE_CREATE` gateway events, the `member` partial object does **not** include `permissions` — Discord only sends `permissions` in interaction payloads. This is fine for slash command permission checks, but the type is shared across both contexts. The `permissions` field should be optional (`permissions?: string`) to accurately model both uses, or separate interfaces should be used.
+Separating leaderboard channels from monitored channels is slightly more work operationally, but it is flexible and clearly reflected in both the schema and the command flow.
 
----
+### 5. The phases are mostly in a practical order
 
-## Design & Best Practices
+Utilities → DB → tracker → processor → recovery → handlers is a sensible implementation sequence.
 
-### 5. Coupling of leaderboard channel and monitored channel
+## Major Correctness Issues
 
-`/setleaderboardchannel` adds the channel to both `leaderboard_channels` and `monitored_channels`. `/removeleaderboardchannel` removes from both. This means there's no way to monitor a channel for streaks *without* it being a leaderboard posting target, and vice versa. The architecture document says the same thing, so the plan is consistent, but consider whether this 1:1 coupling is truly desired. If a server wants one "music-uploads" channel monitored but the leaderboard posted in a "bot-spam" channel, this design doesn't support it. If the coupling is intentional, the plan should acknowledge the trade-off.
+### 1. Advancing `recovery_state` inside `processMessage` is dangerous
 
-### 6. No `/addmonitoredchannel` command
+This is the biggest issue in the plan.
 
-Related to the above: the architecture and plan provide no way to add a monitored channel independently of a leaderboard channel. If the 1:1 coupling from point 5 is intentional, `monitored_channels` as a separate table is unnecessary overhead — you could just query `leaderboard_channels`. If independent monitoring is desired, a separate command is needed.
+Right now, both the architecture and plan say that `processMessage` advances `recovery_state.last_processed_message_id` after successful processing. That is safe for recovery, but it is **not** safe when the same function is called from the live gateway path.
 
-### 7. Content hashing should be specified
+Example failure mode:
 
-The scheduled handler hashes leaderboard content to skip redundant posts, but neither the architecture nor the plan specifies the hashing algorithm. Pin this down (e.g., SHA-256 hex digest of the formatted string) to avoid ambiguity during implementation.
+- the bot misses older messages while offline
+- after restart, a new live message arrives and is processed through the gateway
+- `recovery_state` is advanced to that new message ID
+- later, recovery fetches `after=last_processed_message_id`
+- the older missed messages are now permanently skipped
 
-### 8. Rate limiting on the Discord REST API
+That would create silent data loss.
 
-The Discord API client in Phase 6 uses raw `fetch` with no rate-limit handling. The recovery service can fire many `GET /messages` requests in a loop, and the scheduled handler hits `DELETE` + `POST` per channel. The plan should include at least basic rate-limit awareness:
-- Respect `429` responses and `Retry-After` headers.
-- Consider a simple sequential queue or delay between requests.
+### Recommended change
 
-Without this, the bot will break under real-world conditions, especially during recovery of channels with deep message history.
+- `recovery_state` should be advanced by the recovery flow, not by the generic `processMessage` path
+- alternatively, `processMessage` should accept an explicit mode or option controlling whether checkpoint advancement is allowed
+- the plan should add a test proving that live gateway processing cannot move the recovery checkpoint past unseen historical messages
 
-### 9. `processed_messages` table will grow unboundedly
+Without this change, the recovery design is not correct.
 
-Every music message that passes through the system inserts a row into `processed_messages`. There's no pruning strategy. Over months or years this table will grow indefinitely. The plan should include a maintenance step — either in the scheduled handler or as a separate periodic task — to delete rows older than some threshold (e.g., 7 days). Once a message is older than the recovery window, idempotency protection is no longer needed.
+### 2. Message claim + stats mutation must be atomic
 
-### 10. No error handling strategy for `processMessage` failures
+The plan correctly says the message ID should be claimed before mutating stats, but it does not go far enough. Those operations must occur in a **single transaction**.
 
-Phase 4 tests that `recovery_state` isn't advanced past a failure, which is good. But the plan doesn't specify what happens to the *gateway* path when `processMessage` fails. Should it log and swallow? Retry? The gateway path is fire-and-forget by nature, so the answer is probably "log and move on, recovery will retry later", but this should be explicit.
+Otherwise this failure is possible:
 
-### 11. Recovery could re-process the checkpoint message itself
+- insert into `processed_messages` succeeds
+- updating `user_stats` fails
+- the message is now marked as processed
+- recovery sees it as already claimed and skips it forever
 
-The `GET /messages?after={id}` endpoint returns messages **after** the given ID (exclusive), so this is actually fine. But the plan's test language in **7.1** — "test begins from `last_processed_message_id` when present" — is ambiguous. Clarify that the checkpoint ID is excluded from the fetch, not re-processed.
+That would permanently lose the event.
 
----
+### Recommended change
 
-## Missing Items
+- explicitly require `claimProcessedMessage`, stats update, and any related writes to happen in one database transaction
+- add a test that simulates a failure after claiming and verifies the message is still retryable
+- document whether `recovery_state` update is in the same transaction or intentionally separate
 
-### 12. Slash command registration script or step
+This needs to be specified, not left implicit.
 
-Phase 12 says "Register slash commands through the Discord API" but provides no detail. The plan should include the command registration payloads (command name, description, options with types) or at least reference a registration script. The `/leaderboard` command takes an optional `channel` option of type `CHANNEL` — this needs to be specified in the registration payload.
+### 3. Leaderboard merging across multiple monitored channels is underspecified and likely incorrect
 
-### 13. No `resolveChannelName` for the `/leaderboard` slash command
+The plan says `/leaderboard` and scheduled posting should query all monitored channels linked to a leaderboard channel and “merge rows.” That is not enough detail.
 
-The architecture says `/leaderboard` "resolves a display name before calling the formatter so the header can render `#channel-name`". The plan's test in **9.3** says "test passes the channel display name into `formatLeaderboard`", but doesn't specify *where* the name comes from. Options:
-- From `interaction.channel.name` (available in the interaction payload for the current channel).
-- From a Discord API call for a different channel when the `channel` option is provided.
-- From the `leaderboard_channels` table.
+If the same user posts in multiple monitored channels linked to one leaderboard channel, what should happen?
 
-The plan should specify the resolution strategy, especially for the case where a user passes a channel option pointing to a channel that isn't in `leaderboard_channels`.
+Possible interpretations:
 
-### 14. No test for gateway client lifecycle (heartbeat, reconnection, resume)
+- show one row per user per monitored channel
+- aggregate by user across channels
+- take the max active streak across channels
+- sum runs across channels
+- take the max best streak across channels
 
-Phase 8 only tests event dispatch routing. The gateway connection itself (heartbeat, reconnect on disconnect, session resume) is a critical piece. The plan says "gateway client" in Phase 0 dependencies but doesn't address which library handles this or whether custom lifecycle management is needed. If using a library like `discord.js` or `cloudflare/discord-gateway`, state that. If rolling a custom gateway client, it deserves its own phase.
+Those all produce different leaderboards.
 
-### 15. No handling of Discord message types in the processor
+Given the product description says “maintains per-user streak statistics based on post timing” and “posts a separate leaderboard inside each configured leaderboard channel,” the likely intent is one row per user in the leaderboard output. If so, the plan currently does not define the aggregation rule and may produce duplicate rows for the same user.
 
-Phase 4 has a test "test ignores system/non-default messages when they should not affect streaks" — good. But the plan doesn't specify *which* message types are accepted. The architecture's Notes.md shows many message types. At minimum, only `DEFAULT` (0) and `REPLY` (19) should be processed. This filter should be a named constant or set in `constants.ts`.
+### Recommended change
 
-### 16. Missing `DB` type or database initialization details
+- explicitly define cross-channel aggregation semantics for linked monitored channels
+- add tests for the same user appearing in multiple monitored channels linked to one leaderboard channel
+- decide whether the leaderboard is:
+  - channel-scoped and duplicated per source channel, or
+  - aggregated per user across linked channels
 
-The plan references a `Database` type as the first argument to all query functions but doesn't define it in the types reference or specify how the database is initialized. Is this `better-sqlite3`? `D1Database` from Cloudflare? The `Env` interface suggests Cloudflare Workers (bindings pattern), but the plan never says so. If this is Workers + D1, that has significant implications:
-- D1 operations are already wrapped in the D1 API; the retry logic may need to account for D1-specific error shapes.
-- The `scheduled` handler and gateway client have different runtime constraints on Workers.
+This should be resolved before implementation.
 
-This should be clarified in Phase 0.
+## Medium-Risk Design Problems
 
----
+### 4. The DB retry pattern is over-applied
 
-## Minor Nits
+The plan wraps every exported DB function in `withRetry`. For synchronous `better-sqlite3`, that is not obviously helpful.
 
-- **`ADMINISTRATOR_PERMISSION` as `0x8n` (BigInt)**: The permissions bitfield from Discord is a string. The plan's `hasAdministratorPermission(permissions: string)` will need to parse the string to a `BigInt` before comparing. This is fine, but note that `0x8n` requires BigInt arithmetic throughout — make sure tests cover this.
-- **`DiscordAttachment.content_type` is optional**: The `hasMusicAttachment` function tests file extensions, not MIME types, so this is consistent. But if Discord ever sends an attachment without a filename (unlikely but possible), the extension check would fail silently. A fallback to `content_type` could be a nice safeguard.
-- **`async-retry` types**: The plan installs `@types/async-retry`. Verify this package exists and is current — some retry libraries ship their own types now.
-- **Test infrastructure for DB tests**: Phase 2 tests need a real (or in-memory) SQLite database. The plan doesn't mention test fixtures or setup/teardown for DB state. A brief note on using an in-memory database per test suite would help.
+Most failures will be deterministic programming or SQL errors, and blindly retrying them three times adds noise rather than resilience. There is also no backoff or filtering for retryable conditions.
 
----
+### Recommended change
 
-## Summary
+- either remove DB retries entirely for local SQLite operations
+- or restrict retries to known transient failures such as busy/locked conditions
+- if retries remain, document the exact retryable error criteria
 
-The plan is solid and implementation-ready for the most part. The **critical items** to resolve before starting are:
+As written, this is more ceremony than value.
 
-1. **Streak reset value** (0 vs 1) — almost certainly a bug in both architecture and plan.
-2. **`computeStreakDelta` signature** — needs to handle the null/first-post case cleanly.
-3. **Recovery bootstrap** — specify behavior when there's no checkpoint.
-4. **Platform/runtime** — clarify if this is Cloudflare Workers + D1 or Node + better-sqlite3; this affects multiple phases.
-5. **Rate limiting** — the Discord client will fail without it.
-6. **`processed_messages` pruning** — unbounded growth is a production risk.
+### 5. The schema should define relational and indexing intent more clearly
 
-Everything else is either a minor clarification or a nice-to-have improvement. The TDD discipline, the shared `processMessage` path, the idempotency design, and the content-hash skip logic are all well thought out.
+The logical relationships are clear, but the schema is missing important implementation details:
+
+- `monitored_channels.leaderboard_channel_id` should likely reference `leaderboard_channels.channel_id`
+- `processed_messages.processed_at` likely needs an index because pruning is time-based
+- `monitored_channels.leaderboard_channel_id` likely needs an index because it is queried frequently
+
+SQLite does not require full relational rigor for a small bot, but the plan should at least state whether foreign keys are intentionally enforced.
+
+### Recommended change
+
+- specify whether `PRAGMA foreign_keys = ON` will be used
+- add indexes for hot query paths and prune paths
+- define deletion behavior intentionally rather than only in command handlers
+
+### 6. `updated_at` behavior is still ambiguous
+
+The plan includes tests such as “preserves `updated_at` behavior expected by the schema,” but the schema itself does not automatically update `updated_at` on UPSERT. That only happens if the SQL explicitly sets it.
+
+### Recommended change
+
+- specify exact `updated_at` semantics for `user_stats`, `leaderboard_channels`, and `recovery_state`
+- add explicit SQL behavior in the plan rather than relying on the schema default
+
+Right now the intention is clear, but the implementation contract is not.
+
+### 7. The shared processor needs an explicit normalization boundary
+
+Recovery works with raw REST-shaped message payloads. The live gateway path uses `discord.js` message objects. Those are not the same shape.
+
+The plan treats both as if they can be fed directly into one shared `processMessage` function. That may be possible, but only if there is an explicit normalization step.
+
+### Recommended change
+
+- define a small internal canonical message type used by `processMessage`
+- add adapters from `discord.js` gateway messages and REST recovery messages into that canonical type
+- add tests that both adapters preserve the fields used for streak logic
+
+This will reduce friction and keep the processor clean.
+
+## Best-Practice Concerns
+
+### 8. The rate-limit strategy is safe but very conservative
+
+The proposed `1_100 ms` minimum delay between all Discord API calls is simple and safe for a small bot, but it may become slow if many monitored or leaderboard channels are configured.
+
+For example, hourly recovery plus delete/post cycles could take a long time if every request is fully serialized behind a global delay.
+
+### Recommendation
+
+- keep this if the bot is expected to stay small
+- otherwise note that this is an intentionally simple v1 strategy and may need per-route or bucket-aware handling later
+
+I would not block the plan on this, but I would label it as a deliberate simplicity tradeoff.
+
+### 9. FNV-1a is fine for change detection, but the wording is slightly too strong
+
+The plan says FNV-1a has “good collision resistance for this use case.” That is directionally fine for lightweight content-change detection, but it is not collision-resistant in any strong sense.
+
+### Recommendation
+
+- reword this as “sufficient for lightweight non-cryptographic change detection”
+
+This is minor, but worth tightening.
+
+### 10. The TDD requirement is good, but the plan is somewhat test-heavy in the glue layers
+
+The pure logic layers clearly benefit from TDD. Some of the HTTP wiring and registration-script work may not justify the same granularity of unit testing, especially if it slows delivery.
+
+### Recommendation
+
+- keep strong TDD for streak logic, DB behavior, recovery, and idempotency
+- allow lighter integration-focused tests for thin transport glue
+
+That would keep the plan rigorous without becoming overly procedural.
+
+## Missing Items That Should Be Added
+
+### 1. Add an explicit test for out-of-order timestamps or impossible deltas
+
+Even if Discord ordering is usually reliable, the tracker should define behavior when `newPostTimestamp < lastMusicPostAt`.
+
+### Recommended addition
+
+- decide whether to ignore the message, clamp the delta, or treat it as no-op
+- add a test for this case
+
+### 2. Add sanitization/escaping rules for leaderboard formatting
+
+Usernames can contain characters that will break table formatting, especially pipes, backticks, and long names.
+
+### Recommended addition
+
+- define how usernames are escaped or normalized in leaderboard output
+- add a test for usernames that contain markdown/table-breaking characters
+
+### 3. Add startup behavior for recovery
+
+If scheduled work only runs hourly, the bot could remain stale for up to an hour after restart.
+
+### Recommended addition
+
+- run one recovery pass shortly after startup, or
+- run `runScheduledWork` once on boot before starting the interval
+
+This is not strictly required, but it would materially improve correctness after downtime.
+
+### 4. Add tests for command-side validation and permission edge cases
+
+The plan covers the main admin permission checks, but it should also explicitly test:
+
+- missing `member` payload on an interaction
+- missing or malformed `permissions`
+- commands invoked outside guild context
+- channel lookup failures for `/leaderboard [channel]`
+
+These are common Discord edge cases.
+
+### 5. Add a decision on first recovery fetch behavior
+
+The plan says recovery starts from `after=0` when no checkpoint exists. That may work, but it is worth verifying rather than assuming.
+
+### Recommended addition
+
+- confirm that `after=0` is accepted and behaves as intended by Discord for this endpoint
+- if not, define the first-request strategy differently
+
+This is small, but it is better to resolve now than during implementation.
+
+## Suggested Plan Changes
+
+If I were revising the plan, I would make these concrete changes:
+
+1. Remove checkpoint advancement from the generic `processMessage` path and move it into recovery-specific orchestration.
+2. Require a single transaction for message claim + stat mutation, and add tests for partial-failure rollback.
+3. Define exactly how leaderboard rows are aggregated across multiple monitored channels linked to one leaderboard channel.
+4. Add a canonical internal message shape plus adapters for gateway and recovery inputs.
+5. Clarify `updated_at` semantics and add missing indexes / foreign-key decisions.
+6. Add formatting-safety tests for usernames and message-length edge cases.
+7. Add an immediate-on-start recovery or scheduled run.
+
+## Final Verdict
+
+This is a **good plan with a solid architectural foundation**, but it is **not yet implementation-safe without revision**.
+
+My recommendation is:
+
+- keep the overall structure
+- keep the phased sequence
+- keep the shared processor and recovery-first mindset
+- revise the checkpoint and transaction semantics before any coding begins
+- clarify leaderboard aggregation semantics before implementing command and scheduled output
+
+If those items are corrected, the plan becomes much stronger and should be a reliable basis for implementation.
