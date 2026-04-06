@@ -2,51 +2,57 @@
 
 ## Overview
 
-A Discord bot built a **gateway-based event ingestion model** and sqlite for persistence. The bot listens for `MESSAGE_CREATE` events through the Discord Gateway, tracks music file uploads per channel, maintains per-user streak statistics based on post timing, and posts a separate leaderboard inside each configured leaderboard channel.
+A Discord bot built with **discord.js** for gateway event ingestion and **better-sqlite3** for persistence, running on **Bun**. The bot listens for `MESSAGE_CREATE` events through the Discord Gateway, tracks music file uploads per channel, maintains per-user streak statistics based on post timing, and posts a separate leaderboard inside each configured leaderboard channel.
 
-Slash commands are still handled through Discord Interactions over HTTP, while message ingestion happens through the Gateway event stream.
+Monitored channels and leaderboard channels are configured independently. A monitored channel links to the leaderboard channel where its stats are displayed.
+
+Slash commands are handled through Discord Interactions over HTTP, while message ingestion happens through the Gateway event stream. The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection, session resume).
 
 ## System Architecture
 
 ### Tech Stack
-- **Gateway Layer**: Discord Gateway Intents client
+- **Runtime**: Bun
+- **Gateway Layer**: discord.js (handles gateway lifecycle)
 - **HTTP Interface**: Discord Interactions endpoint for slash commands
-- **Database**: sqlite
+- **Database**: better-sqlite3 (synchronous)
 - **Language**: TypeScript
-- **Discord Integration**: Discord Gateway + Discord REST API + Discord Interactions
+- **Discord Integration**: discord.js + Discord REST API + Discord Interactions
 
 ### Core Components
 
 #### 1. Main App Structure
 ```
 src/
-├── index.ts                 # Main entry point, gateway bootstrapping, fetch handler, scheduled handler
-├── constants.ts             # File extensions, time values, permission bits
+├── index.ts                 # Main entry point, discord.js client setup, scheduled jobs
+├── types.ts                 # Shared interfaces and type definitions
+├── constants.ts             # File extensions, time values, permission bits, accepted message types
 ├── handlers/
 │   ├── gateway.ts           # Gateway event dispatcher for MESSAGE_CREATE
 │   ├── interactions.ts      # Slash command router + handlers
-│   └── scheduled.ts         # Scheduled leaderboard update + maintenance orchestration
+│   └── scheduled.ts         # Scheduled orchestration (recovery + leaderboard posting + maintenance)
 ├── db/
-│   ├── schema.sql           # sqlite table definitions
-│   └── queries.ts           # Database operations
+│   ├── schema.sql           # better-sqlite3 table definitions
+│   └── queries.ts           # Database operations (synchronous)
 ├── services/
 │   ├── tracker.ts           # Streak calculation logic
-│   ├── leaderboard.ts       # Leaderboard query shaping + text formatting
+│   ├── leaderboard.ts       # Leaderboard query shaping + text formatting + content hashing
 │   ├── recovery.ts          # Backfill logic for monitored channels
 │   ├── processor.ts         # Shared message processing path used by gateway + recovery
-│   └── discord.ts           # Discord REST API client
-└── utils/
-    ├── time.ts              # Time window calculations
-    ├── signature.ts         # Discord interaction signature verification
-    ├── permissions.ts       # ADMINISTRATOR permission checks
-    └── db-helpers.ts        # Retry and Result helpers
+│   └── discord.ts           # Discord REST API client with rate-limit handling
+├── utils/
+│   ├── time.ts              # Time window calculations
+│   ├── signature.ts         # Discord interaction signature verification
+│   ├── permissions.ts       # ADMINISTRATOR permission checks (BigInt)
+│   └── db-helpers.ts        # Retry and Result helpers (synchronous)
+└── scripts/
+    └── register-commands.ts # One-shot script to register slash commands with Discord
 ```
 
 #### 2. Database Schema (sqlite)
 
 ```sql
 -- User music tracking (per channel)
-CREATE TABLE user_stats (
+CREATE TABLE IF NOT EXISTS user_stats (
     channel_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     username TEXT NOT NULL,
@@ -58,7 +64,7 @@ CREATE TABLE user_stats (
 );
 
 -- Channels that should receive a scheduled leaderboard post
-CREATE TABLE leaderboard_channels (
+CREATE TABLE IF NOT EXISTS leaderboard_channels (
     channel_id TEXT PRIMARY KEY,
     guild_id TEXT NOT NULL,
     channel_name TEXT NOT NULL,
@@ -68,7 +74,7 @@ CREATE TABLE leaderboard_channels (
 );
 
 -- Last posted leaderboard message per leaderboard channel
-CREATE TABLE leaderboard_posts (
+CREATE TABLE IF NOT EXISTS leaderboard_posts (
     channel_id TEXT PRIMARY KEY,
     message_id TEXT NOT NULL,
     content_hash TEXT NOT NULL,
@@ -76,21 +82,22 @@ CREATE TABLE leaderboard_posts (
 );
 
 -- Message recovery checkpoint per monitored channel
-CREATE TABLE recovery_state (
+CREATE TABLE IF NOT EXISTS recovery_state (
     channel_id TEXT PRIMARY KEY,
     last_processed_message_id TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Channels that should be scanned for music uploads
-CREATE TABLE monitored_channels (
+-- Channels that should be scanned for music uploads, linked to a leaderboard channel
+CREATE TABLE IF NOT EXISTS monitored_channels (
     channel_id TEXT PRIMARY KEY,
     guild_id TEXT NOT NULL,
+    leaderboard_channel_id TEXT NOT NULL,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Message IDs already processed, used for idempotency across gateway and recovery paths
-CREATE TABLE processed_messages (
+CREATE TABLE IF NOT EXISTS processed_messages (
     message_id TEXT PRIMARY KEY,
     channel_id TEXT NOT NULL,
     processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -100,15 +107,18 @@ CREATE TABLE processed_messages (
 #### 3. Gateway Message Flow
 
 ```
-Discord MESSAGE_CREATE event
+Discord MESSAGE_CREATE event (via discord.js client.on('messageCreate'))
     ↓
-Discord Gateway → gateway dispatcher
+Is message.author.bot? → Yes → ignore
+    ↓
+Is message.type in ACCEPTED_MESSAGE_TYPES (DEFAULT=0, REPLY=19)? → No → ignore
     ↓
 Is channel in monitored_channels?
     ├─ No → ignore
     └─ Yes
          ↓
       Does message have a supported music attachment?
+      (check file extension first; fall back to content_type starts with 'audio/' if no filename)
          ├─ No → ignore
          └─ Yes
               ↓
@@ -129,6 +139,8 @@ Is channel in monitored_channels?
 
 The gateway path and the recovery path both call the same shared message-processing function so the bot has one authoritative streak-update implementation.
 
+On `processMessage` failure in the gateway path, the error is logged and swallowed. Recovery will retry the message later.
+
 #### 4. Tracking Logic (Time Windows)
 
 ```
@@ -141,7 +153,7 @@ IF T_last IS NULL:
     run_count = 1
     highest_run_seen = 1
 ELSE IF Delta > 36 hours:
-    run_count = 0
+    run_count = 1 (the new post itself starts a fresh streak)
 ELSE IF Delta > 8 hours AND Delta <= 36 hours:
     run_count += 1
     highest_run_seen = max(highest_run_seen, run_count)
@@ -156,23 +168,45 @@ Update last_music_post_at = T_now
 #### 5. Slash Commands
 
 **`/leaderboard [channel]`**
-- Shows the music leaderboard for a specific channel
+- Shows the music leaderboard for a leaderboard channel
 - Defaults to the current channel when no option is provided
-- Queries by `channel_id`, sorted by `run_count DESC, highest_run_seen DESC`
-- Resolves a display name before calling the formatter so the header can render `#channel-name`
+- Verifies the target channel is in `leaderboard_channels`; returns an error if not
+- Channel name resolution:
+  - Current channel: from `interaction.channel.name`
+  - Provided channel: via `fetchChannel` Discord API call
+- Queries all `monitored_channels` linked to the target leaderboard channel, merges their `user_stats` rows
+- Sorted by `run_count DESC, highest_run_seen DESC`
+- Returns an ephemeral response
 
 **`/setleaderboardchannel`**
+- Takes no arguments; operates on the current channel
 - Marks the current channel as a leaderboard channel
-- Also adds the current channel to `monitored_channels`
-- Requires the invoking member to have the `ADMINISTRATOR` permission
+- Does **not** add it to `monitored_channels` (monitored channels are managed separately)
+- Requires the invoking member to have the `ADMINISTRATOR` permission (BigInt bitfield check)
 - Upserts a row in `leaderboard_channels`, refreshing the stored `channel_name`
 - Responds with confirmation or permission denied error
 
 **`/removeleaderboardchannel`**
+- Takes no arguments; operates on the current channel
 - Removes the current channel from `leaderboard_channels`
-- Also removes the current channel from `monitored_channels`
+- Removes all `monitored_channels` rows that reference this leaderboard channel
 - Deletes any stored `leaderboard_posts` row for that channel
-- Stops future tracking and posting for the channel but keeps historical `user_stats`, `recovery_state`, and `processed_messages` rows intact
+- Stops future tracking and posting but keeps historical `user_stats`, `recovery_state`, and `processed_messages` rows intact
+- Requires the invoking member to have the `ADMINISTRATOR` permission
+- Responds with confirmation or permission denied error
+
+**`/addmonitoredchannel <channel>`**
+- Takes one required argument: the channel to monitor for music uploads
+- Must be run from a leaderboard channel (the current channel must be in `leaderboard_channels`)
+- Adds the provided channel to `monitored_channels` with `leaderboard_channel_id` set to the current channel
+- Idempotent (adding the same channel again does not error)
+- Requires the invoking member to have the `ADMINISTRATOR` permission
+- Responds with confirmation or permission denied error
+
+**`/removemonitoredchannel <channel>`**
+- Takes one required argument: the channel to stop monitoring
+- Removes the provided channel from `monitored_channels`
+- Does not delete historical `user_stats`, `recovery_state`, or `processed_messages` rows
 - Requires the invoking member to have the `ADMINISTRATOR` permission
 - Responds with confirmation or permission denied error
 
@@ -187,7 +221,7 @@ Rank | User | Current Run | Best Run
 3    | @user3 | 1 | 5
 ```
 
-**Query** (channel-specific):
+**Query** (per monitored channel, then merged across all monitored channels for a leaderboard):
 ```sql
 SELECT
     username,
@@ -199,20 +233,21 @@ ORDER BY run_count DESC, highest_run_seen DESC
 LIMIT 50;
 ```
 
-#### 6. Scheduled Leaderboard Update
+#### 6. Scheduled Work
 
-**Cron Trigger**: `0 * * * *` (every hour)
+**Timer**: `setInterval` or `node-cron`, every hour
 
 **Flow**:
 ```
-Cron Trigger → Scheduled Event
+Hourly Timer → runScheduledWork
     ↓
-Recover monitored channels first
+1. Recover all monitored channels
     ↓
-For each leaderboard_channels entry:
-    ├─ Query leaderboard rows for that same channel
+2. For each leaderboard_channels entry:
+    ├─ Query all monitored_channels linked to this leaderboard channel
+    ├─ For each linked monitored channel, query user_stats and merge rows
     ├─ Format leaderboard content using the stored channel_name
-    ├─ Hash rendered content
+    ├─ Hash rendered content (FNV-1a)
     ├─ Compare against leaderboard_posts.content_hash for the channel
     ├─ If unchanged → skip posting
     ├─ If changed:
@@ -221,17 +256,20 @@ For each leaderboard_channels entry:
     │   ├─ POST /channels/{channel_id}/messages
     │   └─ UPSERT leaderboard_posts(channel_id, message_id, content_hash, posted_at)
     └─ Continue to the next leaderboard channel
+    ↓
+3. Prune processed_messages rows older than 14 days
 ```
 
 Each configured leaderboard channel is tracked independently. There is no single global leaderboard channel.
 
 #### 7. Message Recovery
 
-**Flow** (runs during scheduled work and optionally at startup):
+**Flow** (runs during scheduled work):
 ```
 For each monitored_channels entry:
     ├─ Read recovery_state.last_processed_message_id
-    ├─ Fetch messages after that ID
+    ├─ If null, use after=0 to fetch from the beginning of the channel
+    ├─ Fetch messages after that ID (exclusive — the checkpoint message is not re-fetched)
     │   (GET /channels/{channel.id}/messages?after={last_id}&limit=100)
     ├─ Sort fetched messages into ascending snowflake / chronological order
     ├─ For each message from oldest to newest:
@@ -257,10 +295,12 @@ Use **Discord message timestamps** for all streak comparisons:
 ### Idempotent Message Processing
 The system must prevent double-processing when the same message is seen via both the live gateway path and the recovery path.
 
-The write path should guarantee that message claiming and stat mutation are serialized together. The implementation can use a transaction or an equivalent single-write-path mechanism, but the required behavior is:
+The write path should guarantee that message claiming and stat mutation are serialized together. Since better-sqlite3 is synchronous and single-threaded, transactions provide natural serialization. The required behavior is:
 - a message ID is processed at most once
 - a failed attempt does not advance `recovery_state` past the failure point
 - recovery can safely re-fetch already seen messages without corrupting streak counts
+
+Rows in `processed_messages` older than 14 days are pruned during scheduled work to prevent unbounded table growth.
 
 ### Leaderboard Post Replacement
 When deleting a previous leaderboard message:
@@ -269,32 +309,53 @@ When deleting a previous leaderboard message:
 - other non-2xx responses should be logged
 - the new post should still be attempted unless the failure indicates a fatal permissions issue
 
+### Content Hashing
+Leaderboard content is hashed using **FNV-1a** (fast, non-cryptographic) to detect changes. Only post a new message when the hash differs from the stored `content_hash` in `leaderboard_posts`.
+
+### Discord API Rate Limiting
+The Discord REST API client enforces:
+- A minimum delay of **1 100 ms** between consecutive requests (stays within 5 requests / 5 seconds)
+- On a `429` response, reads `Retry-After` header, waits that duration, then retries once
+- On a second consecutive `429`, returns `Result.err`
+
 ### Channel Name Source of Truth
 Scheduled leaderboard posts use the `channel_name` stored in `leaderboard_channels`.
 
 That stored value is refreshed each time `/setleaderboardchannel` is run for the channel.
 
 ### Permission Verification for Channel Management
-`/setleaderboardchannel` and `/removeleaderboardchannel` are restricted to members with the `ADMINISTRATOR` permission.
+All admin commands (`/setleaderboardchannel`, `/removeleaderboardchannel`, `/addmonitoredchannel`, `/removemonitoredchannel`) are restricted to members with the `ADMINISTRATOR` permission.
 
-The interaction payload exposes permissions as a bitfield string. The handler should parse that bitfield and test the `ADMINISTRATOR` bit.
+The interaction payload exposes permissions as a bitfield string. The handler parses that string to a `BigInt` and tests with bitwise AND against `ADMINISTRATOR_PERMISSION` (`0x8n`).
+
+### Message Type Filtering
+Only `DEFAULT` (type 0) and `REPLY` (type 19) messages are processed. All other message types are ignored.
+
+### Music Attachment Detection
+1. Primary check: file extension from `filename` against `MUSIC_EXTENSIONS`
+2. Fallback: if `filename` is absent, check `content_type` starts with `audio/`
 
 ### Environment Variables
 ```bash
 DISCORD_APPLICATION_ID=xxx
 DISCORD_PUBLIC_KEY=xxx
 DISCORD_BOT_TOKEN=xxx
+DATABASE_PATH=./data/leaderboard.db
 ```
 
 ## Deployment
 
-- TBD
+### Prerequisites
+- Bun runtime installed on the target machine
+- A persistent filesystem for the SQLite database
 
 ### Discord App Setup
 1. Create the app at https://discord.com/developers/applications
 2. Enable the **Message Content** privileged intent
-3. Enable the Gateway intents required for guild messages
-4. Register slash commands: `/leaderboard`, `/setleaderboardchannel`, `/removeleaderboardchannel`
-5. Configure the Interactions endpoint for slash commands
+3. Enable the Gateway intents: `GUILDS`, `GUILD_MESSAGES`, `MESSAGE_CONTENT`
+4. Register slash commands by running `bun run src/scripts/register-commands.ts`
+5. Configure the Interactions endpoint URL for slash commands
 6. Install the bot with permissions to read messages, send messages, manage messages, and read message history
-7. Use `/setleaderboardchannel` in each channel that should both be monitored and receive its own scheduled leaderboard post
+7. Start the bot: `bun run src/index.ts`
+8. Use `/setleaderboardchannel` in each channel that should display a leaderboard
+9. Use `/addmonitoredchannel` from each leaderboard channel to link the channels that should be monitored for music uploads
