@@ -19,6 +19,12 @@ The implementation uses strong Red/Green TDD for business logic, persistence, re
 
 ---
 
+## Project wiki
+
+See `Notes/wiki/wiki-rules.md` and follow them to build the wiki alongside the source code implementation.
+
+---
+
 ## DB Access Pattern
 
 Every database operation follows the same `Result` pattern. Exported DB functions may use a small synchronous retry wrapper, but retries are restricted to known transient SQLite lock conditions only. The `Database` type is `BetterSqlite3.Database` from `better-sqlite3`. Since better-sqlite3 is synchronous, `toResult` wraps synchronous calls.
