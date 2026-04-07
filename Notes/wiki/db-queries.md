@@ -1,0 +1,51 @@
+# db/queries.ts
+
+All exported database operations for the leaderboard bot. Every function follows the `fn` / `fnActual` pattern: the public export wraps a private `*Actual` function in `withRetry`; the `*Actual` function uses `toResult` to normalise exceptions. All return types are `Result<T, Error>` (synchronous, better-sqlite3).
+
+## getUserStats / upsertUserStats
+
+- `getUserStats(db, channelId, userId): Result<UserStats | null, Error>` — fetches a row from `user_stats` by `(channel_id, user_id)`.
+- `upsertUserStats(db, stats): Result<void, Error>` — inserts or updates with explicit `ON CONFLICT(channel_id, user_id) DO UPDATE`, setting `updated_at = CURRENT_TIMESTAMP` in the `DO UPDATE` clause.
+
+## getLeaderboard
+
+- `getLeaderboard(db, channelId): Result<LeaderboardRow[], Error>` — returns up to `LEADERBOARD_MAX_ROWS` (50) rows sorted `run_count DESC, highest_run_seen DESC`. Excludes rows where both `run_count = 0` and `highest_run_seen = 0`.
+
+## Leaderboard Channel CRUD
+
+- `getLeaderboardChannels(db)` — all rows from `leaderboard_channels`.
+- `upsertLeaderboardChannel(db, channel)` — insert or update `channel_name` and `updated_at` on conflict.
+- `deleteLeaderboardChannel(db, channelId)` — removes the row (cascade deletes linked `monitored_channels` row via FK).
+- `getLeaderboardChannel(db, channelId)` — single row or `null`.
+
+## Leaderboard Post CRUD
+
+- `getLeaderboardPost(db, channelId)` — stored post for a leaderboard channel, or `null`.
+- `upsertLeaderboardPost(db, post)` — insert or overwrite `message_id`, `content_hash`, and `posted_at`.
+- `deleteLeaderboardPost(db, channelId)` — removes the row.
+
+## Recovery State
+
+- `getRecoveryState(db, channelId)` — last-checkpoint row or `null`.
+- `upsertRecoveryState(db, state)` — insert or update `last_processed_message_id` and `updated_at`.
+
+## Monitored Channels
+
+- `getMonitoredChannels(db)` — all rows.
+- `addMonitoredChannel(db, channel)` — insert with `ON CONFLICT(channel_id) DO NOTHING` (idempotent for the same channel). Attempting to link a *different* monitored channel to a leaderboard that already has one fails with a UNIQUE constraint error on `leaderboard_channel_id`.
+- `deleteMonitoredChannel(db, channelId)` — removes the row.
+- `isMonitoredChannel(db, channelId)` — `boolean` existence check.
+- `getMonitoredChannelByLeaderboard(db, leaderboardChannelId)` — the single monitored channel linked to a leaderboard channel, or `null`.
+
+## Processed Messages (Idempotency)
+
+- `claimProcessedMessage(db, { messageId, channelId })` — inserts with `ON CONFLICT DO NOTHING`; returns `true` if the row was inserted (first claim), `false` if already existed.
+- `hasProcessedMessage(db, messageId)` — existence check.
+- `pruneProcessedMessages(db, thresholdDays)` — deletes rows older than `thresholdDays` days using `datetime('now', '-N days')`.
+
+## Related pages
+
+- [schema.md](schema.md) — table definitions
+- [util-db-helpers.md](util-db-helpers.md) — `toResult`, `withRetry`
+- [types.md](types.md) — `UserStats`, `LeaderboardRow`, etc.
+- [tests-queries.md](tests-queries.md) — test coverage

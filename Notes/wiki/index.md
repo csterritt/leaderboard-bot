@@ -17,9 +17,19 @@
 - **[util-permissions.md](util-permissions.md)** — `hasAdministratorPermission` BigInt permission check
 - **[util-db-helpers.md](util-db-helpers.md)** — `toResult` and `withRetry` DB access helpers
 
+## Database
+
+- **[db-queries.md](db-queries.md)** — All DB query functions in `db/queries.ts`: `getUserStats`, `upsertUserStats`, `getLeaderboard`, leaderboard channel CRUD, leaderboard post CRUD, recovery state, monitored channels, processed message idempotency
+
+## Services
+
+- **[service-tracker.md](service-tracker.md)** — `services/tracker.ts`: `computeNewStats`, `hasMusicAttachment`, `resolveUsername`
+
 ## Tests
 
 - **[tests-time.md](tests-time.md)** — Tests for `utils/time.ts`
 - **[tests-signature.md](tests-signature.md)** — Tests for `utils/signature.ts`
 - **[tests-permissions.md](tests-permissions.md)** — Tests for `utils/permissions.ts`
 - **[tests-db-helpers.md](tests-db-helpers.md)** — Tests for `utils/db-helpers.ts`
+- **[tests-queries.md](tests-queries.md)** — Tests for `db/queries.ts` (37 tests)
+- **[tests-tracker.md](tests-tracker.md)** — Tests for `services/tracker.ts` (25 tests)

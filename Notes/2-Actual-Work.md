@@ -1,1 +1,1 @@
-Implement both Phase 0 and Phase 1 of the plan in Notes/Plan.md.
+Implement both Phase 2 and Phase 3 of the plan in Notes/Plan.md.

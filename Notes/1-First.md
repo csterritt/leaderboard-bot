@@ -3,3 +3,5 @@ Pretend you’re my assistant and you actually want me to succeed. Ask up to 3 m
 For this task, you're working as an expert software planner and developer.
 
 See the rulies in Notes/wiki/wiki-rules.md for how to build and maintain the wiki.
+
+Refer to the wiki for any context you might need; see Notes/wiki/index.md for an overview.

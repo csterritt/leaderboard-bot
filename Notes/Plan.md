@@ -140,30 +140,30 @@ Work through these phases in order. Each step: write the failing test first, the
 
 ### Phase 0 — Project Scaffolding
 
-- [ ] **0.1** Initialise project: `bun init`, install dependencies
+- [x] **0.1** Initialise project: `bun init`, install dependencies
   - Runtime: `bun`
   - Discord: `discord.js`
   - DB: `better-sqlite3`, `@types/better-sqlite3`
   - Result: `true-myth`
   - Testing: `vitest`
   - Types: `typescript`
-- [ ] **0.2** Configure `tsconfig.json` with strict mode and bundler module resolution
-- [ ] **0.3** Configure `vitest.config.ts`
+- [x] **0.2** Configure `tsconfig.json` with strict mode and bundler module resolution
+- [x] **0.3** Configure `vitest.config.ts`
   - Each test suite creates its own in-memory better-sqlite3 database via `new Database(':memory:')` and applies `schema.sql` in a `beforeEach` or `beforeAll` hook
-- [ ] **0.4** Create `src/db/schema.sql` with `user_stats`, `leaderboard_channels`, `leaderboard_posts`, `recovery_state`, `monitored_channels`, and `processed_messages`
+- [x] **0.4** Create `src/db/schema.sql` with `user_stats`, `leaderboard_channels`, `leaderboard_posts`, `recovery_state`, `monitored_channels`, and `processed_messages`
   - Enable relational integrity with `PRAGMA foreign_keys = ON`
   - Add a foreign key from `monitored_channels.leaderboard_channel_id` to `leaderboard_channels.channel_id`
   - Enforce one monitored channel per leaderboard channel
   - Add indexes required for prune and lookup hot paths (`processed_messages.processed_at`; rely on the `UNIQUE` constraint index for `monitored_channels.leaderboard_channel_id`)
-- [ ] **0.5** Apply schema to local file-based database for manual testing and verify `PRAGMA foreign_keys = ON` is enabled on the connection
-- [ ] **0.6** Create `src/constants.ts` with `MUSIC_EXTENSIONS`, `EIGHT_HOURS_SECS`, `THIRTY_SIX_HOURS_SECS`, `LEADERBOARD_MAX_ROWS`, `ADMINISTRATOR_PERMISSION`, `STANDARD_RETRY_OPTIONS`, and `ACCEPTED_MESSAGE_TYPES`
-- [ ] **0.7** Create `src/types.ts` with the shared interfaces in the Types section below
+- [x] **0.5** Apply schema to local file-based database for manual testing and verify `PRAGMA foreign_keys = ON` is enabled on the connection
+- [x] **0.6** Create `src/constants.ts` with `MUSIC_EXTENSIONS`, `EIGHT_HOURS_SECS`, `THIRTY_SIX_HOURS_SECS`, `LEADERBOARD_MAX_ROWS`, `ADMINISTRATOR_PERMISSION`, `STANDARD_RETRY_OPTIONS`, and `ACCEPTED_MESSAGE_TYPES`
+- [x] **0.7** Create `src/types.ts` with the shared interfaces in the Types section below
 
 ---
 
 ### Phase 1 — Utility Layer
 
-- [ ] **1.1 — `utils/time.ts`**
+- [x] **1.1 — `utils/time.ts`**
   - RED: test `parseDiscordTimestamp` converts ISO8601 strings to Unix seconds integers
   - RED: test fractional seconds and timezone normalization edge cases
   - GREEN: implement `parseDiscordTimestamp(iso: string): number`
@@ -179,18 +179,18 @@ Work through these phases in order. Each step: write the failing test first, the
     - `<= 129_600` → `'increment'`
     - `> 129_600` → `'reset'`
 
-- [ ] **1.2 — `utils/signature.ts`**
+- [x] **1.2 — `utils/signature.ts`**
   - RED: test a valid Discord interaction signature passes verification
   - RED: test a tampered body fails verification
   - GREEN: implement `verifyDiscordSignature({ publicKey, timestamp, body, signature }): Promise<boolean>`
 
-- [ ] **1.3 — `utils/permissions.ts`**
+- [x] **1.3 — `utils/permissions.ts`**
   - RED: test `hasAdministratorPermission` returns `true` when the `ADMINISTRATOR` bit is present
   - RED: test `hasAdministratorPermission` returns `false` when the bit is absent
   - RED: test handles the permissions string as a BigInt (parse string → `BigInt`, test with bitwise AND against `0x8n`)
   - GREEN: implement `hasAdministratorPermission(permissions: string): boolean`
 
-- [ ] **1.4 — `utils/db-helpers.ts`**
+- [x] **1.4 — `utils/db-helpers.ts`**
   - RED: test `toResult` returns `Result.ok(value)` on success
   - RED: test `toResult` returns `Result.err(Error)` when the callback throws
   - RED: test `withRetry` retries when the inner operation returns `Result.err` for `SQLITE_BUSY`
@@ -205,25 +205,25 @@ Work through these phases in order. Each step: write the failing test first, the
 
 All exported functions follow the `fn` / `fnActual` pattern. `Database` (`BetterSqlite3.Database`) is always the first argument. All return types are `Result<T, Error>` (synchronous).
 
-- [ ] **2.1 — `getUserStats`**
+- [x] **2.1 — `getUserStats`**
   - RED: test returns `Result.ok(null)` for an unknown user in a channel
   - RED: test returns `Result.ok(UserStats)` for a known user
   - GREEN: implement `getUserStats(db, channelId, userId): Result<UserStats | null, Error>`
 
-- [ ] **2.2 — `upsertUserStats`**
+- [x] **2.2 — `upsertUserStats`**
   - RED: test inserts a new row when no record exists
   - RED: test updates an existing row using explicit UPSERT semantics
   - RED: test sets `updated_at` on insert
   - RED: test refreshes `updated_at` on update
   - GREEN: implement `upsertUserStats(db, stats): Result<void, Error>` with `INSERT ... ON CONFLICT(channel_id, user_id) DO UPDATE`
 
-- [ ] **2.3 — `getLeaderboard`**
+- [x] **2.3 — `getLeaderboard`**
   - RED: test returns an empty array for a channel with no data
   - RED: test returns rows sorted by `run_count DESC, highest_run_seen DESC`, max 50
   - RED: test excludes rows where both `run_count = 0` and `highest_run_seen = 0`
   - GREEN: implement `getLeaderboard(db, channelId): Result<LeaderboardRow[], Error>`
 
-- [ ] **2.4 — `getLeaderboardChannels` / `upsertLeaderboardChannel` / `deleteLeaderboardChannel` / `getLeaderboardChannel`**
+- [x] **2.4 — `getLeaderboardChannels` / `upsertLeaderboardChannel` / `deleteLeaderboardChannel` / `getLeaderboardChannel`**
   - RED: test `getLeaderboardChannels` returns an empty array initially
   - RED: test `upsertLeaderboardChannel` inserts a new channel row
   - RED: test `upsertLeaderboardChannel` updates `channel_name` and `updated_at` on conflict
@@ -231,20 +231,20 @@ All exported functions follow the `fn` / `fnActual` pattern. `Database` (`Better
   - RED: test `getLeaderboardChannel` returns `null` for unknown channel, returns the row for a known channel
   - GREEN: implement all four functions
 
-- [ ] **2.5 — `getLeaderboardPost` / `upsertLeaderboardPost` / `deleteLeaderboardPost`**
+- [x] **2.5 — `getLeaderboardPost` / `upsertLeaderboardPost` / `deleteLeaderboardPost`**
   - RED: test `getLeaderboardPost` returns `null` for a channel with no stored post
   - RED: test `upsertLeaderboardPost` overwrites the stored message for the same `channel_id`
   - RED: test `upsertLeaderboardPost` persists the content hash
   - RED: test `deleteLeaderboardPost` removes the row
   - GREEN: implement all three functions using `channel_id` as the key
 
-- [ ] **2.6 — `getRecoveryState` / `upsertRecoveryState`**
+- [x] **2.6 — `getRecoveryState` / `upsertRecoveryState`**
   - RED: test returns `null` for an unknown channel
   - RED: test round-trips `last_processed_message_id`
   - RED: test `updated_at` is set on insert and refreshed on update
   - GREEN: implement both using explicit UPSERT syntax
 
-- [ ] **2.7 — `getMonitoredChannels` / `addMonitoredChannel` / `deleteMonitoredChannel` / `isMonitoredChannel` / `getMonitoredChannelByLeaderboard`**
+- [x] **2.7 — `getMonitoredChannels` / `addMonitoredChannel` / `deleteMonitoredChannel` / `isMonitoredChannel` / `getMonitoredChannelByLeaderboard`**
   - RED: test monitored channels are empty initially
   - RED: test adding a monitored channel with a `leaderboardChannelId` inserts a row
   - RED: test adding the same channel again is idempotent
@@ -254,7 +254,7 @@ All exported functions follow the `fn` / `fnActual` pattern. `Database` (`Better
   - RED: test `getMonitoredChannelByLeaderboard` returns the linked monitored channel for a given leaderboard channel
   - GREEN: implement all five functions
 
-- [ ] **2.8 — `claimProcessedMessage` / `hasProcessedMessage` / `pruneProcessedMessages`**
+- [x] **2.8 — `claimProcessedMessage` / `hasProcessedMessage` / `pruneProcessedMessages`**
   - RED: test first claim for a message ID succeeds
   - RED: test second claim for the same message ID is rejected
   - RED: test `hasProcessedMessage` returns `true` after a successful claim
@@ -268,7 +268,7 @@ All exported functions follow the `fn` / `fnActual` pattern. `Database` (`Better
 
 The tracker contains pure business logic. It takes the current `UserStats | null`, a new post timestamp, and a username, then returns updated stats.
 
-- [ ] **3.1 — `computeNewStats`**
+- [x] **3.1 — `computeNewStats`**
   - RED: test first-ever post sets `runCount = 1` and `highestRunSeen = 1`
   - RED: test delta `<= 8h` leaves `runCount` unchanged and updates `lastMusicPostAt`
   - RED: test negative deltas are clamped to `0`, leave `runCount` unchanged, and preserve the newer of the two timestamps as `lastMusicPostAt`
@@ -277,7 +277,7 @@ The tracker contains pure business logic. It takes the current `UserStats | null
   - RED: test `delta > 36h` resets `runCount` to `1` (the new post itself starts a fresh streak)
   - GREEN: implement `computeNewStats(existing, newPostTimestamp, username)`
 
-- [ ] **3.2 — `hasMusicAttachment`**
+- [x] **3.2 — `hasMusicAttachment`**
   - RED: test returns `true` for `.mp3`, `.ogg`, `.wav`, `.flac`, `.m4a`, and `.aac`
   - RED: test file extension matching is case-insensitive
   - RED: test `song.mp3.txt` is rejected
@@ -289,7 +289,7 @@ The tracker contains pure business logic. It takes the current `UserStats | null
     - Primary check: file extension from `filename`
     - Fallback: if `filename` is absent, check `content_type` starts with `audio/`
 
-- [ ] **3.3 — `resolveUsername`**
+- [x] **3.3 — `resolveUsername`**
   - RED: test prefers `member.nick`
   - RED: test falls back to `author.global_name`
   - RED: test falls back to `author.username`
