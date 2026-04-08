@@ -4,6 +4,15 @@
 
 - **[overview.md](overview.md)** — High-level architecture, runtime, data flow, and design decisions for the Discord Music Leaderboard Bot
 
+## Wiki Maintenance
+
+- **[wiki-rules.md](wiki-rules.md)** — Rules and workflow for maintaining this wiki as a persistent project knowledge base
+- **[log.md](log.md)** — Chronological record of wiki ingests and maintenance passes
+
+## Scripts
+
+- **[register-commands.md](register-commands.md)** — `src/scripts/register-commands.ts`: bulk slash-command registration workflow and environment requirements
+
 ## Configuration / Schema
 
 - **[schema.md](schema.md)** — Database schema: all tables, columns, constraints, indexes, and UPSERT patterns
@@ -56,8 +65,9 @@
 - **[tests-gateway.md](tests-gateway.md)** — Tests for `handlers/gateway.ts` (5 tests)
 - **[tests-interactions.md](tests-interactions.md)** — Tests for `handlers/interactions.ts` (38 tests)
 - **[tests-scheduled.md](tests-scheduled.md)** — Tests for `handlers/scheduled.ts` (11 tests)
-- **[util-shutdown.md](util-shutdown.md)** — Tests for `utils/shutdown.ts` (8 tests)
-- **[entry-point.md](entry-point.md)** — Integration tests for `src/index.ts` (2 tests)
+- **[tests-shutdown.md](tests-shutdown.md)** — Tests for `utils/shutdown.ts` (8 tests)
+- **[tests-index.md](tests-index.md)** — Integration tests for `src/index.ts` (2 tests)
+- **[tests-unit.md](tests-unit.md)** — Unit test documentation
 
 ## E2E Tests
 
@@ -66,3 +76,4 @@
 - **[e2e-recovery.md](e2e-recovery.md)** — `e2e-tests/recovery/recovery-pipeline.test.ts`: 8 e2e tests for the recovery pipeline
 - **[e2e-scheduled.md](e2e-scheduled.md)** — `e2e-tests/scheduled/scheduled-work.test.ts`: 8 e2e tests for the scheduled work cycle
 - **[e2e-interactions.md](e2e-interactions.md)** — `e2e-tests/interactions/slash-commands.test.ts`: 19 e2e tests for slash command interactions
+- **[e2e-tests.md](e2e-tests.md)** — E2E test documentation

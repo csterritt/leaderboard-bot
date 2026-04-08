@@ -51,9 +51,11 @@ src/
 │   └── discord.ts            # Discord REST API client
 ├── utils/
 │   ├── time.ts               # Timestamp + streak delta
+│   ├── clock.ts              # Mockable clock helper used by e2e tests
 │   ├── signature.ts          # Interaction signature verification
 │   ├── permissions.ts        # ADMINISTRATOR permission check
-│   └── db-helpers.ts         # withRetry, toResult
+│   ├── db-helpers.ts         # withRetry, toResult
+│   └── shutdown.ts           # Graceful shutdown helper
 └── scripts/
     └── register-commands.ts  # One-shot slash command registration
 ```

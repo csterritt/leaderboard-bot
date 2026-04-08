@@ -122,3 +122,25 @@ Implemented:
 - `src/scripts/register-commands.ts`: bulk-registers all 5 slash commands via `PUT /applications/{application_id}/commands`. Reads `DISCORD_BOT_TOKEN` and `DISCORD_APPLICATION_ID` from environment. Run via `bun run src/scripts/register-commands.ts`.
 
 Deployment steps (12.2–12.9) are operational and performed manually.
+
+## [2026-04-08] lint | Wiki audit and maintenance pass
+
+Reviewed the wiki against the current source tree and test suites for completeness, accuracy, and organization.
+
+Updated:
+- `index.md` to restore the wiki-maintenance section, add the command-registration script page, fix unit-test links, and catalog the e2e documentation pages.
+- `overview.md` to include `src/utils/clock.ts` and `src/utils/shutdown.ts` in the source map.
+
+Added missing documentation pages:
+- `register-commands.md`
+- `tests-index.md`
+- `tests-shutdown.md`
+- `tests-unit.md`
+- `e2e-clock.md`
+- `e2e-streaks.md`
+- `e2e-recovery.md`
+- `e2e-scheduled.md`
+- `e2e-interactions.md`
+- `e2e-tests.md`
+
+No source code or database schema changes were made during this pass; this was a documentation-only maintenance update.

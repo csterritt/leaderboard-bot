@@ -1,3 +1,8 @@
-Act as a meticulous code planner and coder.
+Act as a meticulous code reviewer.
 
-Add graceful shutdown (SIGTERM/SIGINT) handling.
+Review the content of the wiki, compared to the code, and make sure it is:
+- Complete
+- Accurate
+- Up to date
+- Well organized
+- Easy to understand
