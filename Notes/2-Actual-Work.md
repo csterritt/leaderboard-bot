@@ -1,1 +1,1 @@
-Implement Phases 4, 5, and 6 of the plan in Notes/Plan.md.
+Implement Phases 7, 8, and 9 of the plan in Notes/Plan.md.

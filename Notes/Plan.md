@@ -389,7 +389,7 @@ This is an intentionally simple v1 strategy. If the bot grows, it may need per-r
 
 ### Phase 7 — Recovery Service (`services/recovery.ts`)
 
-- [ ] **7.1 — `recoverChannel`**
+- [x] **7.1 — `recoverChannel`**
   - RED: test begins from `last_processed_message_id` (exclusive — the checkpoint message itself is not re-fetched)
   - RED: test begins from `after=0` when `last_processed_message_id` is `null` (fetches from the very beginning of the channel)
   - RED: test sorts each fetched batch from oldest to newest before processing
@@ -400,7 +400,7 @@ This is an intentionally simple v1 strategy. If the bot grows, it may need per-r
   - RED: test loops through multiple pages until caught up
   - GREEN: implement `recoverChannel(db, token, channelId): Promise<Result<number, Error>>`
 
-- [ ] **7.2 — `recoverAllChannels`**
+- [x] **7.2 — `recoverAllChannels`**
   - RED: test iterates all monitored channels and calls `recoverChannel` for each
   - GREEN: implement `recoverAllChannels(db, token): Promise<Result<void, Error>>`
 
@@ -410,7 +410,7 @@ This is an intentionally simple v1 strategy. If the bot grows, it may need per-r
 
 The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection, session resume). This handler only needs to listen for events on the `discord.js` `Client`.
 
-- [ ] **8.1 — Gateway event dispatch**
+- [x] **8.1 — Gateway event dispatch**
   - RED: test `messageCreate` events are normalized and routed to `processMessage`
   - RED: test bot messages are ignored before reaching `processMessage`
   - RED: test gateway processing does **not** advance `recovery_state`
@@ -423,17 +423,17 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
 
 ### Phase 9 — Slash Command Handlers (`handlers/interactions.ts`)
 
-- [ ] **9.1 — Interaction signature verification**
+- [x] **9.1 — Interaction signature verification**
   - RED: test missing signature headers return `401`
   - RED: test invalid signatures return `401`
   - RED: test valid requests reach the interaction router
   - GREEN: implement interaction verification middleware
 
-- [ ] **9.2 — Ping/pong**
+- [x] **9.2 — Ping/pong**
   - RED: test `type = 1` returns `{ type: 1 }`
   - GREEN: implement the ping handler
 
-- [ ] **9.3 — `/leaderboard [channel]`**
+- [x] **9.3 — `/leaderboard [channel]`**
   - RED: test when no channel option is provided, uses `interaction.channel_id` as the target
   - RED: test when a channel option is provided, uses that channel ID as the target
   - RED: test returns an error if the target channel is not in `leaderboard_channels`
@@ -447,7 +447,7 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
   - RED: test returns an error when `fetchChannel` fails for a provided channel option
   - GREEN: implement `/leaderboard`
 
-- [ ] **9.4 — `/setleaderboardchannel`**
+- [x] **9.4 — `/setleaderboardchannel`**
   - Takes no arguments; operates on the current channel.
   - RED: test rejects interactions missing `member` or `member.permissions`
   - RED: test rejects interactions invoked outside a guild context
@@ -458,7 +458,7 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
   - RED: test does **not** add the current channel to `monitored_channels` (monitored channels are managed separately)
   - GREEN: implement `/setleaderboardchannel`
 
-- [ ] **9.5 — `/removeleaderboardchannel`**
+- [x] **9.5 — `/removeleaderboardchannel`**
   - Takes no arguments; operates on the current channel.
   - RED: test rejects interactions missing `member` or `member.permissions`
   - RED: test rejects interactions invoked outside a guild context
@@ -469,7 +469,7 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
   - RED: test does not delete historical `user_stats`, `recovery_state`, or `processed_messages` rows
   - GREEN: implement `/removeleaderboardchannel`
 
-- [ ] **9.6 — `/addmonitoredchannel <channel>`**
+- [x] **9.6 — `/addmonitoredchannel <channel>`**
   - Takes one required argument: the channel to monitor.
   - RED: test rejects interactions missing `member` or `member.permissions`
   - RED: test rejects interactions invoked outside guild context
@@ -480,7 +480,7 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
   - RED: test rejects linking a different monitored channel when the current leaderboard channel already has one linked monitored channel
   - GREEN: implement `/addmonitoredchannel`
 
-- [ ] **9.7 — `/removemonitoredchannel <channel>`**
+- [x] **9.7 — `/removemonitoredchannel <channel>`**
   - Takes one required argument: the channel to stop monitoring.
   - RED: test rejects interactions missing `member` or `member.permissions`
   - RED: test rejects interactions invoked outside guild context
@@ -489,7 +489,7 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
   - RED: test does not delete historical `user_stats`, `recovery_state`, or `processed_messages` rows
   - GREEN: implement `/removemonitoredchannel`
 
-- [ ] **9.8 — Interaction router**
+- [x] **9.8 — Interaction router**
   - RED: test unknown commands return `400`
   - GREEN: implement the command router
 

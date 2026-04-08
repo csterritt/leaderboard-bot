@@ -27,6 +27,12 @@
 - **[service-processor.md](service-processor.md)** — `services/processor.ts`: `normalizeDiscordMessage`, `normalizeGatewayMessage`, `processMessage`
 - **[service-leaderboard.md](service-leaderboard.md)** — `services/leaderboard.ts`: `formatLeaderboard`, `hashContent` (FNV-1a)
 - **[service-discord.md](service-discord.md)** — `services/discord.ts`: `sendMessage`, `deleteMessage`, `fetchMessagesAfter`, `fetchChannel`, rate-limit strategy
+- **[service-recovery.md](service-recovery.md)** — `services/recovery.ts`: `recoverChannel`, `recoverAllChannels`, pagination loop, checkpoint advancement
+
+## Handlers
+
+- **[handler-gateway.md](handler-gateway.md)** — `handlers/gateway.ts`: `setupGatewayHandler`, discord.js `messageCreate` listener, fire-and-forget error handling
+- **[handler-interactions.md](handler-interactions.md)** — `handlers/interactions.ts`: Ed25519 verification, ping handler, all 5 slash commands, interaction router
 
 ## Tests
 
@@ -39,3 +45,6 @@
 - **[tests-processor.md](tests-processor.md)** — Tests for `services/processor.ts` (17 tests)
 - **[tests-leaderboard.md](tests-leaderboard.md)** — Tests for `services/leaderboard.ts` (11 tests)
 - **[tests-discord.md](tests-discord.md)** — Tests for `services/discord.ts` (16 tests)
+- **[tests-recovery.md](tests-recovery.md)** — Tests for `services/recovery.ts` (11 tests)
+- **[tests-gateway.md](tests-gateway.md)** — Tests for `handlers/gateway.ts` (5 tests)
+- **[tests-interactions.md](tests-interactions.md)** — Tests for `handlers/interactions.ts` (38 tests)
