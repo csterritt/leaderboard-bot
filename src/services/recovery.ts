@@ -9,6 +9,21 @@ import { processMessage } from './processor'
 import { normalizeDiscordMessage } from './processor'
 import type { Database } from '../types'
 
+const compareDiscordMessageIds = (left: string, right: string): number => {
+  const numericPattern = /^\d+$/
+  if (numericPattern.test(left) && numericPattern.test(right)) {
+    const leftId = BigInt(left)
+    const rightId = BigInt(right)
+    if (leftId < rightId) return -1
+    if (leftId > rightId) return 1
+    return 0
+  }
+
+  if (left < right) return -1
+  if (left > right) return 1
+  return 0
+}
+
 // ─── 7.1 recoverChannel ───────────────────────────────────────────────────────
 
 export const recoverChannel = async (
@@ -29,7 +44,7 @@ export const recoverChannel = async (
     const messages = fetchResult.value
     if (messages.length === 0) break
 
-    const sorted = [...messages].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    const sorted = [...messages].sort((a, b) => compareDiscordMessageIds(a.id, b.id))
 
     for (const raw of sorted) {
       const msg = normalizeDiscordMessage(raw)

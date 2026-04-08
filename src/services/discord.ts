@@ -36,26 +36,30 @@ const discordFetch = async (
   url: string,
   options: RequestInit,
 ): Promise<Result<Response, Error>> => {
-  await enforceDelay()
+  try {
+    await enforceDelay()
 
-  const headers = {
-    Authorization: token,
-    ...(options.headers as Record<string, string> | undefined),
-  }
+    const headers = {
+      Authorization: token,
+      ...(options.headers as Record<string, string> | undefined),
+    }
 
-  let response = await fetch(url, { ...options, headers })
-
-  if (response.status === 429) {
-    const retryAfter = parseFloat(response.headers.get('Retry-After') ?? '1')
-    await new Promise<void>((resolve) => setTimeout(resolve, retryAfter * 1000))
-    response = await fetch(url, { ...options, headers })
+    let response = await fetch(url, { ...options, headers })
 
     if (response.status === 429) {
-      return Result.err(new Error(`Rate limited twice on ${url}`))
-    }
-  }
+      const retryAfter = parseFloat(response.headers.get('Retry-After') ?? '1')
+      await new Promise<void>((resolve) => setTimeout(resolve, retryAfter * 1000))
+      response = await fetch(url, { ...options, headers })
 
-  return Result.ok(response)
+      if (response.status === 429) {
+        return Result.err(new Error(`Rate limited twice on ${url}`))
+      }
+    }
+
+    return Result.ok(response)
+  } catch (error) {
+    return Result.err(error instanceof Error ? error : new Error(String(error)))
+  }
 }
 
 // ─── 6.2 sendMessage ─────────────────────────────────────────────────────────

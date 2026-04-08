@@ -312,6 +312,16 @@ describe('/setleaderboardchannel', () => {
     expect(body.data.content).toContain('permission')
   })
 
+  it('treats a malformed permissions string as non-admin instead of crashing', async () => {
+    const res = await dispatch(db, makeInteraction({
+      member: { nick: null, permissions: 'not-a-number' },
+      data: { name: 'setleaderboardchannel' },
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { data: { content: string } }
+    expect(body.data.content).toContain('permission')
+  })
+
   it('accepts a user with ADMINISTRATOR permission and upserts the channel', async () => {
     const res = await dispatch(db, makeInteraction({
       member: { nick: null, permissions: ADMIN_PERMISSIONS },

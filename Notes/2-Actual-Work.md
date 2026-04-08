@@ -1,5 +1,12 @@
-Plan and implement end-to-end testing for the bot. Put the tests in the e2e-tests/ directory, under
-appropriate categories.
-
-You'll probably have to implement a time facility that can be mocked for testing. It should allow setting
-the current time, advancing time, and checking if a given time has passed.
+Act as a meticulous code reviewer
+Review this code for: 
+- Code quality problems
+- Best practice violations
+- General mistakes
+- Logic correctness and edge case handling
+- Security vulnerabilities and data validation
+- Performance implications and resource usage
+- Code style and maintainability standards
+- Error handling and logging
+- Test coverage and quality
+- Documentation and comments

@@ -80,6 +80,10 @@ describe('hashContent', () => {
     expect(h1).toBe(h2)
   })
 
+  it('matches the known FNV-1a 32-bit hash for hello world', () => {
+    expect(hashContent('hello world')).toBe('d58b3fa7')
+  })
+
   it('produces different digests for different inputs', () => {
     const h1 = hashContent('hello world')
     const h2 = hashContent('hello worlds')

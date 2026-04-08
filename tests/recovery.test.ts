@@ -119,6 +119,30 @@ describe('recoverChannel', () => {
     expect(state.value?.lastProcessedMessageId).toBe('msg-300')
   })
 
+  it('processes numeric Discord snowflake IDs in numeric order rather than lexicographic order', async () => {
+    const msgs: DiscordMessage[] = [
+      makeDiscordMessage({ id: '10', timestamp: '2024-01-03T12:00:00.000Z' }),
+      makeDiscordMessage({ id: '2', timestamp: '2024-01-02T12:00:00.000Z' }),
+      makeDiscordMessage({ id: '1', timestamp: '2024-01-01T12:00:00.000Z' }),
+    ]
+
+    let callCount = 0
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      callCount++
+      if (callCount === 1) {
+        return new Response(JSON.stringify(msgs), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }))
+
+    const result = await recoverChannel(db, TOKEN, MC_ID)
+    expect(result.isOk).toBe(true)
+
+    const state = getRecoveryState(db, MC_ID)
+    expect(state.isOk).toBe(true)
+    expect(state.value?.lastProcessedMessageId).toBe('10')
+  })
+
   it('skips already-processed message IDs safely (idempotent)', async () => {
     const msg = makeDiscordMessage({ id: 'msg-already-done' })
     db.prepare(`

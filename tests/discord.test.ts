@@ -138,6 +138,21 @@ describe('sendMessage', () => {
 
     expect(result.isOk).toBe(false)
   })
+
+  it('returns Result.err when fetch throws', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('network down')
+    }))
+
+    const p = sendMessage(TOKEN, CHANNEL_ID, 'hi')
+    await vi.runAllTimersAsync()
+    const result = await p
+
+    expect(result.isOk).toBe(false)
+    if (!result.isOk) {
+      expect(result.error.message).toContain('network down')
+    }
+  })
 })
 
 // ─── deleteMessage ────────────────────────────────────────────────────────────
