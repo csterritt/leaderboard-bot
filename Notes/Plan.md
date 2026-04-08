@@ -301,13 +301,13 @@ The tracker contains pure business logic. It takes the current `UserStats | null
 
 This service is the single authoritative path for message ingestion used by both the gateway handler and recovery. It accepts a small internal normalized message shape so the gateway path and recovery path adapt their source payloads before processing. Only `DEFAULT` (type 0) and `REPLY` (type 19) messages are accepted; all other message types are ignored.
 
-- [ ] **4.1 — Message normalization**
+- [x] **4.1 — Message normalization**
   - RED: test gateway `discord.js` messages are normalized into the internal message shape used by `processMessage`
   - RED: test recovery REST payloads are normalized into the same internal message shape
   - RED: test both adapters preserve the fields used by streak logic and attachment detection
   - GREEN: implement normalization helpers for gateway and recovery inputs
 
-- [ ] **4.2 — `processMessage`**
+- [x] **4.2 — `processMessage`**
   - RED: test ignores a message from a non-monitored channel
   - RED: test ignores a message with no supported music attachment
   - RED: test ignores bot messages (`author.bot === true`)
@@ -328,7 +328,7 @@ This service is the single authoritative path for message ingestion used by both
 
 ### Phase 5 — Leaderboard Service (`services/leaderboard.ts`)
 
-- [ ] **5.1 — `formatLeaderboard`**
+- [x] **5.1 — `formatLeaderboard`**
   - RED: test returns a formatted header using the provided channel display name
   - RED: test returns a "no data" message for an empty leaderboard
   - RED: test ranks start at 1 and increment correctly
@@ -336,7 +336,7 @@ This service is the single authoritative path for message ingestion used by both
   - RED: test formatted content remains below Discord's message length limit for the maximum row count
   - GREEN: implement `formatLeaderboard(channelName: string, rows: LeaderboardRow[]): string`
 
-- [ ] **5.2 — `hashContent`**
+- [x] **5.2 — `hashContent`**
   - RED: test produces a consistent hex digest for the same input
   - RED: test produces different digests for different inputs
   - GREEN: implement `hashContent(content: string): string` using FNV-1a (fast, non-cryptographic, sufficient for lightweight change detection)
@@ -354,32 +354,32 @@ Uses `fetch` directly. Tests use request interception. All requests go through a
 
 This is an intentionally simple v1 strategy. If the bot grows, it may need per-route or bucket-aware rate-limit handling later.
 
-- [ ] **6.1 — `discordFetch` (internal helper)**
+- [x] **6.1 — `discordFetch` (internal helper)**
   - RED: test enforces minimum delay between consecutive calls
   - RED: test retries once on `429` after the `Retry-After` duration
   - RED: test returns `Result.err` on a second consecutive `429`
   - GREEN: implement `discordFetch(token, url, options): Promise<Result<Response, Error>>`
 
-- [ ] **6.2 — `sendMessage`**
+- [x] **6.2 — `sendMessage`**
   - RED: test makes `POST /channels/{id}/messages` with correct headers and body
   - RED: test returns `Result.ok(messageId)` on success
   - RED: test returns `Result.err` on non-2xx
   - GREEN: implement `sendMessage(token, channelId, content): Promise<Result<string, Error>>`
 
-- [ ] **6.3 — `deleteMessage`**
+- [x] **6.3 — `deleteMessage`**
   - RED: test makes `DELETE /channels/{id}/messages/{messageId}`
   - RED: test returns `Result.ok(true)` on `204`
   - RED: test returns `Result.ok(true)` on `404`
   - RED: test returns `Result.err` on other non-2xx responses
   - GREEN: implement `deleteMessage(token, channelId, messageId): Promise<Result<boolean, Error>>`
 
-- [ ] **6.4 — `fetchMessagesAfter`**
+- [x] **6.4 — `fetchMessagesAfter`**
   - RED: test makes `GET /channels/{id}/messages?after={afterId}&limit=100`
   - RED: test returns `Result.ok(DiscordMessage[])` on success
   - RED: test returns `Result.err` on non-2xx
   - GREEN: implement `fetchMessagesAfter(token, channelId, afterId): Promise<Result<DiscordMessage[], Error>>`
 
-- [ ] **6.5 — `fetchChannel`**
+- [x] **6.5 — `fetchChannel`**
   - RED: test makes `GET /channels/{id}`
   - RED: test returns `Result.ok({ id, name })` on success
   - RED: test returns `Result.err` on non-2xx

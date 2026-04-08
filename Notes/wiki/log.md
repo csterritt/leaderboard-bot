@@ -34,3 +34,32 @@ Wrote RED tests (`tests/tracker.test.ts`, 25 tests), then implemented GREEN:
 - `resolveUsername` priority: nick → globalName → username.
 
 All 92 tests pass (6 test files).
+
+## [2026-04-07] ingest | Phase 4 -- Shared Message Processor (`services/processor.ts`)
+
+Wrote RED tests (`tests/processor.test.ts`, 17 tests), then implemented GREEN:
+- `normalizeDiscordMessage`: converts raw REST `DiscordMessage` (snake_case) to `NormalizedMessage`.
+- `normalizeGatewayMessage`: converts `discord.js` gateway message (Map-based attachments, `createdTimestamp`) to `NormalizedMessage`.
+- `processMessage`: single transactional path; filters bots/bad types/no-music/non-monitored; atomically claims + upserts stats; rolls back on failure; does not touch `recovery_state`.
+
+All 109 tests pass (7 test files).
+
+## [2026-04-07] ingest | Phase 5 -- Leaderboard Service (`services/leaderboard.ts`)
+
+Wrote RED tests (`tests/leaderboard.test.ts`, 11 tests), then implemented GREEN:
+- `formatLeaderboard`: Discord-safe formatting (header, ranked rows, empty state); escapes `|` and backticks in usernames; truncates to 32 chars; output <= 2 000 chars for 50 rows.
+- `hashContent`: FNV-1a 32-bit hash, returns lowercase hex. Used for leaderboard change detection.
+
+All 120 tests pass (8 test files).
+
+## [2026-04-07] ingest | Phase 6 -- Discord API Client (`services/discord.ts`)
+
+Wrote RED tests (`tests/discord.test.ts`, 16 tests), then implemented GREEN:
+- `discordFetch` (internal): promise-chained delay (>= 1 100 ms between requests); 429 retry with `Retry-After`; second consecutive 429 -> `Result.err`.
+- `sendMessage`: POST /channels/{id}/messages, returns `Result.ok(messageId)`.
+- `deleteMessage`: DELETE /channels/{id}/messages/{msgId}, treats 404 as success.
+- `fetchMessagesAfter`: GET /channels/{id}/messages?after={id}&limit=100, returns `Result.ok(DiscordMessage[])`.
+- `fetchChannel`: GET /channels/{id}, returns `Result.ok({ id, name })`.
+- `_resetRateLimit` exported for test isolation only.
+
+All 136 tests pass (9 test files).

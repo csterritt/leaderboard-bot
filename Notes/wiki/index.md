@@ -24,6 +24,9 @@
 ## Services
 
 - **[service-tracker.md](service-tracker.md)** — `services/tracker.ts`: `computeNewStats`, `hasMusicAttachment`, `resolveUsername`
+- **[service-processor.md](service-processor.md)** — `services/processor.ts`: `normalizeDiscordMessage`, `normalizeGatewayMessage`, `processMessage`
+- **[service-leaderboard.md](service-leaderboard.md)** — `services/leaderboard.ts`: `formatLeaderboard`, `hashContent` (FNV-1a)
+- **[service-discord.md](service-discord.md)** — `services/discord.ts`: `sendMessage`, `deleteMessage`, `fetchMessagesAfter`, `fetchChannel`, rate-limit strategy
 
 ## Tests
 
@@ -33,3 +36,6 @@
 - **[tests-db-helpers.md](tests-db-helpers.md)** — Tests for `utils/db-helpers.ts`
 - **[tests-queries.md](tests-queries.md)** — Tests for `db/queries.ts` (37 tests)
 - **[tests-tracker.md](tests-tracker.md)** — Tests for `services/tracker.ts` (25 tests)
+- **[tests-processor.md](tests-processor.md)** — Tests for `services/processor.ts` (17 tests)
+- **[tests-leaderboard.md](tests-leaderboard.md)** — Tests for `services/leaderboard.ts` (11 tests)
+- **[tests-discord.md](tests-discord.md)** — Tests for `services/discord.ts` (16 tests)
