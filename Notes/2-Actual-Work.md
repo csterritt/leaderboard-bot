@@ -1,8 +1,3 @@
-Act as a meticulous code reviewer.
+Act as a meticulous code designer and coder.
 
-Review the content of the wiki, compared to the code, and make sure it is:
-- Complete
-- Accurate
-- Up to date
-- Well organized
-- Easy to understand
+Set up the project to collect coverage statistics when tests are run.
