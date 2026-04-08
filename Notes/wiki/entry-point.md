@@ -16,6 +16,7 @@ The main entry point that wires all subsystems together and starts the bot.
 6. **Startup recovery** — calls `recoverAllChannels(db, token)` immediately (fire-and-forget with error logging). Runs before any interval tick.
 7. **Hourly interval** — `setInterval` at 3 600 000 ms calls `runScheduledWork(db, token)` with error logging.
 8. **Login** — `client.login(DISCORD_BOT_TOKEN)` starts the gateway connection.
+9. **Graceful shutdown** — `createShutdown` from `utils/shutdown.ts` registers `SIGTERM` and `SIGINT` handlers that idempotently stop the HTTP server, clear the hourly interval, destroy the discord.js client, and close the database.
 
 ## Key Design Rules
 
@@ -23,6 +24,7 @@ The main entry point that wires all subsystems together and starts the bot.
 - HTTP server handles only `POST /interactions`; all other requests return 404.
 - All errors from async operations are logged but do not crash the process.
 - `Bun.serve` is used for the HTTP layer (Bun runtime assumed).
+- Graceful shutdown is idempotent — repeated signals do not re-run cleanup.
 
 ## Cross-references
 
@@ -32,3 +34,4 @@ The main entry point that wires all subsystems together and starts the bot.
 - [`service-recovery.md`](service-recovery.md) — `recoverAllChannels`
 - [`schema.md`](schema.md) — applied on startup
 - [`types.md`](types.md) — `Env` interface documents all env vars
+- [`util-shutdown.md`](util-shutdown.md) — `createShutdown` graceful shutdown facility

@@ -17,6 +17,7 @@
 - **[util-signature.md](util-signature.md)** — `verifyDiscordSignature` Ed25519 Discord webhook verification
 - **[util-permissions.md](util-permissions.md)** — `hasAdministratorPermission` BigInt permission check
 - **[util-db-helpers.md](util-db-helpers.md)** — `toResult` and `withRetry` DB access helpers
+- **[util-shutdown.md](util-shutdown.md)** — `createShutdown` idempotent graceful shutdown for SIGTERM/SIGINT
 
 ## Database
 
@@ -55,6 +56,7 @@
 - **[tests-gateway.md](tests-gateway.md)** — Tests for `handlers/gateway.ts` (5 tests)
 - **[tests-interactions.md](tests-interactions.md)** — Tests for `handlers/interactions.ts` (38 tests)
 - **[tests-scheduled.md](tests-scheduled.md)** — Tests for `handlers/scheduled.ts` (11 tests)
+- **[util-shutdown.md](util-shutdown.md)** — Tests for `utils/shutdown.ts` (8 tests)
 - **[entry-point.md](entry-point.md)** — Integration tests for `src/index.ts` (2 tests)
 
 ## E2E Tests

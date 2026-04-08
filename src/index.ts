@@ -6,6 +6,7 @@ import { setupGatewayHandler } from './handlers/gateway'
 import { handleInteraction } from './handlers/interactions'
 import { runScheduledWork } from './handlers/scheduled'
 import { recoverAllChannels } from './services/recovery'
+import { createShutdown } from './utils/shutdown'
 
 // ─── 11.1 Environment ─────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ recoverAllChannels(db, token).then((result) => {
 
 // ─── 11.6 Hourly scheduled work ───────────────────────────────────────────────
 
-setInterval(() => {
+const intervalId = setInterval(() => {
   runScheduledWork(db, token).then((result) => {
     if (!result.isOk) {
       console.error('Scheduled work failed:', result.error)
@@ -77,3 +78,9 @@ setInterval(() => {
 // ─── 11.7 Login ───────────────────────────────────────────────────────────────
 
 client.login(DISCORD_BOT_TOKEN)
+
+// ─── 11.8 Graceful shutdown ──────────────────────────────────────────────────
+
+const shutdown = createShutdown({ server, client, db, intervalId })
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
