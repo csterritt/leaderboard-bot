@@ -497,7 +497,7 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
 
 ### Phase 10 — Scheduled Handler (`handlers/scheduled.ts`)
 
-- [ ] **10.1 — `runScheduledWork`**
+- [x] **10.1 — `runScheduledWork`**
   - RED: test recovery runs before leaderboard posting
   - RED: test `pruneProcessedMessages` runs after leaderboard posting (deletes rows older than 14 days)
   - RED: test does nothing when there are no configured leaderboard channels
@@ -515,22 +515,22 @@ The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection,
 
 ### Phase 11 — Entry Point (`src/index.ts`)
 
-- [ ] **11.1** Create the `discord.js` `Client` with required intents: `Guilds`, `GuildMessages`, `MessageContent`
-- [ ] **11.2** Initialise the better-sqlite3 database from a file path (environment variable `DATABASE_PATH`), enable `PRAGMA foreign_keys = ON`, and apply `schema.sql` if tables don't exist
-- [ ] **11.3** Wire the gateway handler: `setupGatewayHandler(client, db)`
-- [ ] **11.4** Wire the HTTP `fetch` handler (separate HTTP server or express-like listener):
+- [x] **11.1** Create the `discord.js` `Client` with required intents: `Guilds`, `GuildMessages`, `MessageContent`
+- [x] **11.2** Initialise the better-sqlite3 database from a file path (environment variable `DATABASE_PATH`), enable `PRAGMA foreign_keys = ON`, and apply `schema.sql` if tables don't exist
+- [x] **11.3** Wire the gateway handler: `setupGatewayHandler(client, db)`
+- [x] **11.4** Wire the HTTP `fetch` handler (separate HTTP server or express-like listener):
   - `POST /interactions` → signature verification → interaction router
-- [ ] **11.5** Run one recovery pass shortly after startup so the bot does not remain stale until the first hourly interval
-- [ ] **11.6** Set up a `setInterval` (or `node-cron`) timer for hourly scheduled work that calls `runScheduledWork(db, token)`
-- [ ] **11.7** Call `client.login(DISCORD_BOT_TOKEN)` to start the gateway connection
-- [ ] **11.8** Add an integration smoke test that simulates a `messageCreate` event on the client and verifies a DB row is created
-- [ ] **11.9** Add a startup integration test proving that the initial recovery pass runs before the first scheduled interval elapses
+- [x] **11.5** Run one recovery pass shortly after startup so the bot does not remain stale until the first hourly interval
+- [x] **11.6** Set up a `setInterval` (or `node-cron`) timer for hourly scheduled work that calls `runScheduledWork(db, token)`
+- [x] **11.7** Call `client.login(DISCORD_BOT_TOKEN)` to start the gateway connection
+- [x] **11.8** Add an integration smoke test that simulates a `messageCreate` event on the client and verifies a DB row is created
+- [x] **11.9** Add a startup integration test proving that the initial recovery pass runs before the first scheduled interval elapses
 
 ---
 
 ### Phase 12 — Slash Command Registration & Deployment
 
-- [ ] **12.1** Create `src/scripts/register-commands.ts` that registers all slash commands via the Discord REST API:
+- [x] **12.1** Create `src/scripts/register-commands.ts` that registers all slash commands via the Discord REST API:
 
 ```typescript
 const commands = [

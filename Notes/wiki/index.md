@@ -33,6 +33,11 @@
 
 - **[handler-gateway.md](handler-gateway.md)** — `handlers/gateway.ts`: `setupGatewayHandler`, discord.js `messageCreate` listener, fire-and-forget error handling
 - **[handler-interactions.md](handler-interactions.md)** — `handlers/interactions.ts`: Ed25519 verification, ping handler, all 5 slash commands, interaction router
+- **[handler-scheduled.md](handler-scheduled.md)** — `handlers/scheduled.ts`: `runScheduledWork`, recovery → leaderboard refresh → prune pipeline
+
+## Entry Point
+
+- **[entry-point.md](entry-point.md)** — `src/index.ts`: startup sequence, DB init, gateway + HTTP wiring, recovery pass, hourly interval, login
 
 ## Tests
 
@@ -48,3 +53,5 @@
 - **[tests-recovery.md](tests-recovery.md)** — Tests for `services/recovery.ts` (11 tests)
 - **[tests-gateway.md](tests-gateway.md)** — Tests for `handlers/gateway.ts` (5 tests)
 - **[tests-interactions.md](tests-interactions.md)** — Tests for `handlers/interactions.ts` (38 tests)
+- **[tests-scheduled.md](tests-scheduled.md)** — Tests for `handlers/scheduled.ts` (11 tests)
+- **[entry-point.md](entry-point.md)** — Integration tests for `src/index.ts` (2 tests)
