@@ -103,6 +103,19 @@ Wrote integration tests (`tests/index.test.ts`, 2 tests), then implemented:
 
 All 203 tests pass (14 test files).
 
+## [2026-04-08] ingest | Phase 13 — End-to-End Tests & Clock Facility
+
+Implemented:
+- `src/utils/clock.ts`: mockable `Clock` interface (`now()`, `set()`, `advance()`, `hasPassed()`, `reset()`). Used in e2e tests to control time without touching system clock.
+- `e2e-tests/utils/clock.test.ts`: 9 tests for the clock facility.
+- `e2e-tests/streaks/streak-accumulation.test.ts`: 11 e2e tests — full message→processMessage→DB pipeline with time-controlled streaks (first post, noop, increment, reset, peak tracking, multi-user, idempotency, bot/non-music filtering).
+- `e2e-tests/recovery/recovery-pipeline.test.ts`: 8 e2e tests — full recovery pipeline (single-page, paginated, resume from checkpoint, skip pre-claimed, mixed attachments, multi-user, recoverAllChannels, idempotency).
+- `e2e-tests/scheduled/scheduled-work.test.ts`: 8 e2e tests — full scheduled work cycle (new post, skip unchanged hash, delete+repost on change, no-channels no-op, multi-channel, recovery-before-posting, remove-monitored-deletes-post, prune).
+- `e2e-tests/interactions/slash-commands.test.ts`: 19 e2e tests — all 5 slash commands, ping, signature verification, and full admin setup workflow.
+- `e2e-tests/tsconfig.json`: test compiler config matching `tests/` convention.
+
+All 258 tests pass (19 test files: 14 unit + 5 e2e).
+
 ## [2026-04-08] ingest | Phase 12 — Slash Command Registration
 
 Implemented:

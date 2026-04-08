@@ -596,6 +596,15 @@ const commands = [
 - [ ] **12.8** Start the bot: `bun run src/index.ts`
 - [ ] **12.9** Use `/setleaderboardchannel` in each channel that should display a leaderboard, then use `/addmonitoredchannel` from that leaderboard channel to link each channel that should be monitored for music uploads
 
+### Phase 13 — End-to-End Tests (`e2e-tests/`)
+
+- [x] **13.1** Create `src/utils/clock.ts` — mockable `Clock` interface with `now()`, `set()`, `advance()`, `hasPassed()`, and `reset()`
+- [x] **13.2 — `e2e-tests/utils/clock.test.ts`** — 9 tests for the clock facility
+- [x] **13.3 — `e2e-tests/streaks/streak-accumulation.test.ts`** — 11 e2e tests for the full message → processMessage → DB pipeline with time-controlled streaks
+- [x] **13.4 — `e2e-tests/recovery/recovery-pipeline.test.ts`** — 8 e2e tests for the full recovery pipeline: paginated fetch, checkpoint advancement, idempotency, multi-user, multi-channel
+- [x] **13.5 — `e2e-tests/scheduled/scheduled-work.test.ts`** — 8 e2e tests for the full scheduled work cycle: recovery → leaderboard post → content hash dedup → delete/re-post → prune
+- [x] **13.6 — `e2e-tests/interactions/slash-commands.test.ts`** — 19 e2e tests for all slash commands, signature verification, and the full admin setup workflow
+
 ---
 
 ## Types Reference (`src/types.ts`)

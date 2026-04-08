@@ -13,6 +13,7 @@
 ## Utilities
 
 - **[util-time.md](util-time.md)** — `parseDiscordTimestamp` and `computeStreakDelta` implementations and streak classification rules
+- **[util-clock.md](util-clock.md)** — `createClock` mockable clock facility: `now()`, `set()`, `advance()`, `hasPassed()`, `reset()`
 - **[util-signature.md](util-signature.md)** — `verifyDiscordSignature` Ed25519 Discord webhook verification
 - **[util-permissions.md](util-permissions.md)** — `hasAdministratorPermission` BigInt permission check
 - **[util-db-helpers.md](util-db-helpers.md)** — `toResult` and `withRetry` DB access helpers
@@ -55,3 +56,11 @@
 - **[tests-interactions.md](tests-interactions.md)** — Tests for `handlers/interactions.ts` (38 tests)
 - **[tests-scheduled.md](tests-scheduled.md)** — Tests for `handlers/scheduled.ts` (11 tests)
 - **[entry-point.md](entry-point.md)** — Integration tests for `src/index.ts` (2 tests)
+
+## E2E Tests
+
+- **[e2e-clock.md](e2e-clock.md)** — `e2e-tests/utils/clock.test.ts`: 9 tests for the clock facility
+- **[e2e-streaks.md](e2e-streaks.md)** — `e2e-tests/streaks/streak-accumulation.test.ts`: 11 e2e tests for streak accumulation pipeline
+- **[e2e-recovery.md](e2e-recovery.md)** — `e2e-tests/recovery/recovery-pipeline.test.ts`: 8 e2e tests for the recovery pipeline
+- **[e2e-scheduled.md](e2e-scheduled.md)** — `e2e-tests/scheduled/scheduled-work.test.ts`: 8 e2e tests for the scheduled work cycle
+- **[e2e-interactions.md](e2e-interactions.md)** — `e2e-tests/interactions/slash-commands.test.ts`: 19 e2e tests for slash command interactions
