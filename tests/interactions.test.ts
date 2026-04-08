@@ -346,6 +346,15 @@ describe('/setleaderboardchannel', () => {
     expect(lc.value?.channelName).toBe('new-name')
   })
 
+  it('stores the invoking user ID as addedByUserId', async () => {
+    await dispatch(db, makeInteraction({
+      member: { nick: null, permissions: ADMIN_PERMISSIONS, user: { id: 'admin-user-42' } },
+      data: { name: 'setleaderboardchannel' },
+    }))
+    const lc = getLeaderboardChannel(db, LC_ID)
+    expect(lc.value?.addedByUserId).toBe('admin-user-42')
+  })
+
   it('does not add the channel to monitored_channels', async () => {
     await dispatch(db, makeInteraction({ data: { name: 'setleaderboardchannel' } }))
     const monitored = getMonitoredChannels(db)
@@ -588,7 +597,51 @@ describe('/removemonitoredchannel', () => {
   })
 })
 
-// ─── 9.8 Interaction router ───────────────────────────────────────────────────
+// ─── Token format ──────────────────────────────────────────────────────────
+
+describe('interaction token format', () => {
+  let db: DatabaseType
+
+  beforeEach(() => {
+    db = makeDb()
+    upsertLeaderboardChannel(db, {
+      channelId: 'other-lc',
+      guildId: GUILD_ID,
+      channelName: 'other-lb',
+      addedByUserId: ADMIN_USER_ID,
+    })
+    addMonitoredChannel(db, {
+      channelId: 'other-mc',
+      guildId: GUILD_ID,
+      leaderboardChannelId: 'other-lc',
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('passes the token with Bot prefix to Discord API calls', async () => {
+    let capturedAuthHeader: string | undefined
+    const fetchMock = vi.fn(async (url: string, opts?: RequestInit) => {
+      capturedAuthHeader = (opts?.headers as Record<string, string>)?.['Authorization']
+      return new Response(JSON.stringify({ id: 'other-lc', name: 'other-lb' }), { status: 200 })
+    })
+
+    const res = await dispatchFetch(db, makeInteraction({
+      channel_id: 'lc-channel',
+      channel: { id: 'lc-channel', name: 'lc-channel' },
+      data: {
+        name: 'leaderboard',
+        options: [{ name: 'channel', value: 'other-lc' }],
+      },
+    }), fetchMock as never)
+    expect(res.status).toBe(200)
+    expect(capturedAuthHeader).toMatch(/^Bot /)
+  })
+})
+
+// ─── 9.8 Interaction router ───────────────────────────────────────────────
 
 describe('interaction router', () => {
   let db: DatabaseType

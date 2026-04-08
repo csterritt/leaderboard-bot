@@ -65,6 +65,7 @@ export interface DiscordUser {
 export interface DiscordMember {
   readonly nick: string | null
   readonly permissions?: string
+  readonly user?: { readonly id: string }
 }
 
 export interface DiscordAttachment {

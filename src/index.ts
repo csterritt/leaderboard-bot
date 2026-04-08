@@ -35,6 +35,10 @@ const client = new Client({
 
 setupGatewayHandler(client, db)
 
+// ─── 11.5a Bot token ──────────────────────────────────────────────────────────
+
+const token = `Bot ${DISCORD_BOT_TOKEN}`
+
 // ─── 11.4 HTTP interactions server ────────────────────────────────────────────
 
 const server = Bun.serve({
@@ -42,7 +46,7 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url)
     if (req.method === 'POST' && url.pathname === '/interactions') {
-      return handleInteraction(req, db, DISCORD_BOT_TOKEN, DISCORD_PUBLIC_KEY)
+      return handleInteraction(req, db, token, DISCORD_PUBLIC_KEY)
     }
     return new Response('Not Found', { status: 404 })
   },
@@ -51,8 +55,6 @@ const server = Bun.serve({
 console.log(`HTTP server listening on port ${server.port}`)
 
 // ─── 11.5 Startup recovery pass ───────────────────────────────────────────────
-
-const token = `Bot ${DISCORD_BOT_TOKEN}`
 
 recoverAllChannels(db, token).then((result) => {
   if (!result.isOk) {

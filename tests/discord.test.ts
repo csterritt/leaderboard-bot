@@ -81,6 +81,31 @@ describe('discordFetch (rate-limit behaviour via sendMessage)', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 
+  it('enforces minimum delay after a 429 retry for the next call', async () => {
+    const callTimestamps: number[] = []
+    let callIndex = 0
+    const responses = [
+      () => new Response(null, { status: 429, headers: { 'Retry-After': '0.1' } }),
+      () => jsonResponse(200, { id: 'msg-retry' }),
+      () => jsonResponse(200, { id: 'msg-next' }),
+    ]
+    const mockFetch = vi.fn(() => {
+      callTimestamps.push(Date.now())
+      const fn = responses[callIndex] ?? responses[responses.length - 1]!
+      callIndex++
+      return Promise.resolve(fn())
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p1 = sendMessage(TOKEN, CHANNEL_ID, 'first')
+    const p2 = sendMessage(TOKEN, CHANNEL_ID, 'second')
+    await vi.runAllTimersAsync()
+    await p1
+    await p2
+
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+  })
+
   it('returns Result.err on a second consecutive 429', async () => {
     const mockFetch = makeFetchMock([
       () => new Response(null, { status: 429, headers: { 'Retry-After': '1' } }),

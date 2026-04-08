@@ -1,5 +1,5 @@
 import { MUSIC_EXTENSIONS, AUDIO_CONTENT_TYPE_PREFIX } from '../constants'
-import { parseDiscordTimestamp, computeStreakDelta } from '../utils/time'
+import { computeStreakDelta } from '../utils/time'
 import type { UserStats, UpsertUserStatsInput, NormalizedAttachment, NormalizedAuthor, NormalizedMember } from '../types'
 
 // ─── 3.1 computeNewStats ─────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ import type { Database, DiscordInteraction } from '../types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-type Verifier = (opts: { publicKey: string; timestamp: string; body: string; signature: string }) => Promise<boolean>
+type Verifier = (opts: { timestamp: string; body: string; signature: string }) => Promise<boolean>
 
 const ephemeralMessage = (content: string) => ({
   type: 4,
@@ -93,7 +93,7 @@ function handleSetLeaderboardChannel(interaction: DiscordInteraction, db: Databa
   const channelId = interaction.channel_id
   const channelName = interaction.channel?.name ?? channelId
   const guildId = interaction.guild_id!
-  const userId = 'unknown'
+  const userId = interaction.member?.user?.id ?? 'unknown'
 
   const result = upsertLeaderboardChannel(db, { channelId, guildId, channelName, addedByUserId: userId })
   if (!result.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
@@ -231,7 +231,7 @@ export const handleInteractionWithVerifier = async (
 
   const body = await request.text()
 
-  const valid = await verifier({ publicKey: '', timestamp, body, signature })
+  const valid = await verifier({ timestamp, body, signature })
   if (!valid) {
     return new Response('Invalid signature', { status: 401 })
   }

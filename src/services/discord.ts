@@ -50,6 +50,7 @@ const discordFetch = async (
       const retryAfter = parseFloat(response.headers.get('Retry-After') ?? '1')
       await new Promise<void>((resolve) => setTimeout(resolve, retryAfter * 1000))
       response = await fetch(url, { ...options, headers })
+      lastRequestAt = Date.now()
 
       if (response.status === 429) {
         return Result.err(new Error(`Rate limited twice on ${url}`))
