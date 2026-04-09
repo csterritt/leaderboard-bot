@@ -9,6 +9,7 @@
 Verifies a Discord interaction signature using the Ed25519 algorithm via the Web Crypto API (`crypto.subtle`).
 
 **Algorithm**:
+
 1. Decode `publicKey` and `signature` from hex strings to `Uint8Array`
 2. Build message bytes: `UTF-8(timestamp + body)`
 3. Import the public key as an `Ed25519` key via `crypto.subtle.importKey`

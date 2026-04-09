@@ -15,16 +15,18 @@ export const _resetRateLimit = (): void => {
 }
 
 const enforceDelay = (): Promise<void> => {
-  const result = pendingChain.then(() => {
-    const now = Date.now()
-    const elapsed = now - lastRequestAt
-    const waitMs = elapsed < DISCORD_API_DELAY_MS ? DISCORD_API_DELAY_MS - elapsed : 0
-    return waitMs > 0
-      ? new Promise<void>((resolve) => setTimeout(resolve, waitMs))
-      : Promise.resolve()
-  }).then(() => {
-    lastRequestAt = Date.now()
-  })
+  const result = pendingChain
+    .then(() => {
+      const now = Date.now()
+      const elapsed = now - lastRequestAt
+      const waitMs = elapsed < DISCORD_API_DELAY_MS ? DISCORD_API_DELAY_MS - elapsed : 0
+      return waitMs > 0
+        ? new Promise<void>((resolve) => setTimeout(resolve, waitMs))
+        : Promise.resolve()
+    })
+    .then(() => {
+      lastRequestAt = Date.now()
+    })
   pendingChain = result
   return result
 }
@@ -85,7 +87,7 @@ export const sendMessage = async (
     return Result.err(new Error(`sendMessage failed: ${response.status}`))
   }
 
-  const data = await response.json() as { id: string }
+  const data = (await response.json()) as { id: string }
   return Result.ok(data.id)
 }
 
@@ -133,7 +135,7 @@ export const fetchMessagesAfter = async (
     return Result.err(new Error(`fetchMessagesAfter failed: ${response.status}`))
   }
 
-  const data = await response.json() as DiscordMessage[]
+  const data = (await response.json()) as DiscordMessage[]
   return Result.ok(data)
 }
 
@@ -154,6 +156,6 @@ export const fetchChannel = async (
     return Result.err(new Error(`fetchChannel failed: ${response.status}`))
   }
 
-  const data = await response.json() as { id: string; name: string }
+  const data = (await response.json()) as { id: string; name: string }
   return Result.ok({ id: data.id, name: data.name })
 }

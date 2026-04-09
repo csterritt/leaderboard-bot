@@ -90,10 +90,13 @@ describe('integration: recovery pass runs at startup before any scheduled interv
   it('recovery is invoked immediately at startup, not deferred to the first interval tick', async () => {
     const callOrder: string[] = []
 
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      callOrder.push('recovery-fetch')
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        callOrder.push('recovery-fetch')
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
 
     const db = makeDb()
     seedChannels(db)

@@ -3,7 +3,12 @@ import Database from 'better-sqlite3'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { setupGatewayHandler } from '../src/handlers/gateway'
-import { addMonitoredChannel, upsertLeaderboardChannel, getUserStats, hasProcessedMessage } from '../src/db/queries'
+import {
+  addMonitoredChannel,
+  upsertLeaderboardChannel,
+  getUserStats,
+  hasProcessedMessage,
+} from '../src/db/queries'
 import type { Database as DatabaseType } from '../src/types'
 import { EventEmitter } from 'events'
 
@@ -88,7 +93,9 @@ describe('setupGatewayHandler', () => {
   it('ignores bot messages before reaching processMessage', () => {
     setupGatewayHandler(client as never, db)
 
-    const botMsg = makeGatewayMessage({ author: { id: 'bot-1', username: 'mybot', globalName: null, bot: true } })
+    const botMsg = makeGatewayMessage({
+      author: { id: 'bot-1', username: 'mybot', globalName: null, bot: true },
+    })
     client.emit('messageCreate', botMsg)
 
     const stats = getUserStats(db, MC_ID, USER_ID)

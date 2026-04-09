@@ -1,6 +1,12 @@
 import { MUSIC_EXTENSIONS, AUDIO_CONTENT_TYPE_PREFIX } from '../constants'
 import { computeStreakDelta } from '../utils/time'
-import type { UserStats, UpsertUserStatsInput, NormalizedAttachment, NormalizedAuthor, NormalizedMember } from '../types'
+import type {
+  UserStats,
+  UpsertUserStatsInput,
+  NormalizedAttachment,
+  NormalizedAuthor,
+  NormalizedMember,
+} from '../types'
 
 // ─── 3.1 computeNewStats ─────────────────────────────────────────────────────
 

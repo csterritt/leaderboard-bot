@@ -40,6 +40,7 @@ process.on('SIGINT', shutdown)
 ## Tests
 
 8 tests in `tests/shutdown.test.ts`:
+
 - Returns a function
 - Stops the HTTP server
 - Destroys the discord.js client

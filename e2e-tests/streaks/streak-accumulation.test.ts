@@ -10,11 +10,7 @@ import Database from 'better-sqlite3'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { processMessage } from '../../src/services/processor'
-import {
-  addMonitoredChannel,
-  upsertLeaderboardChannel,
-  getUserStats,
-} from '../../src/db/queries'
+import { addMonitoredChannel, upsertLeaderboardChannel, getUserStats } from '../../src/db/queries'
 import { createClock } from '../../src/utils/clock'
 import type { Database as DatabaseType, NormalizedMessage } from '../../src/types'
 

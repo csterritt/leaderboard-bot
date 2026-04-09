@@ -95,15 +95,18 @@ describe('scheduled work (e2e)', () => {
     let postedChannelId: string | null = null
     let postedContent: string | null = null
 
-    vi.stubGlobal('fetch', vi.fn(async (url: string, opts: RequestInit) => {
-      const u = String(url)
-      if (u.includes('/messages') && opts.method === 'POST') {
-        postedChannelId = u.match(/channels\/([^/]+)\/messages/)?.[1] ?? null
-        postedContent = JSON.parse(opts.body as string).content
-        return new Response(JSON.stringify({ id: 'new-msg-id' }), { status: 200 })
-      }
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts: RequestInit) => {
+        const u = String(url)
+        if (u.includes('/messages') && opts.method === 'POST') {
+          postedChannelId = u.match(/channels\/([^/]+)\/messages/)?.[1] ?? null
+          postedContent = JSON.parse(opts.body as string).content
+          return new Response(JSON.stringify({ id: 'new-msg-id' }), { status: 200 })
+        }
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -119,17 +122,20 @@ describe('scheduled work (e2e)', () => {
     seedUserStats(db, 'bob', 3, 5)
 
     let postCallCount = 0
-    vi.stubGlobal('fetch', vi.fn(async (url: string, opts: RequestInit) => {
-      const u = String(url)
-      if (u.includes('/messages') && opts.method === 'POST') {
-        postCallCount++
-        return new Response(JSON.stringify({ id: `msg-${postCallCount}` }), { status: 200 })
-      }
-      if (u.includes('/messages/') && opts.method === 'DELETE') {
-        return new Response(null, { status: 204 })
-      }
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts: RequestInit) => {
+        const u = String(url)
+        if (u.includes('/messages') && opts.method === 'POST') {
+          postCallCount++
+          return new Response(JSON.stringify({ id: `msg-${postCallCount}` }), { status: 200 })
+        }
+        if (u.includes('/messages/') && opts.method === 'DELETE') {
+          return new Response(null, { status: 204 })
+        }
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
 
     await runScheduledWork(db, TOKEN)
     const firstPost = getLeaderboardPost(db, LC_ID)
@@ -148,20 +154,21 @@ describe('scheduled work (e2e)', () => {
     const deletedMsgIds: string[] = []
     let postCallCount = 0
 
-    const makeStub = () => vi.fn(async (url: string, opts: RequestInit) => {
-      const u = String(url)
-      const method = opts?.method ?? 'GET'
-      if (method === 'POST' && u.includes('/messages')) {
-        postCallCount++
-        return new Response(JSON.stringify({ id: `msg-post-${postCallCount}` }), { status: 200 })
-      }
-      if (method === 'DELETE' && u.includes('/messages/')) {
-        const parts = u.split('/messages/')
-        deletedMsgIds.push(parts[parts.length - 1]!)
-        return new Response(null, { status: 204 })
-      }
-      return new Response(JSON.stringify([]), { status: 200 })
-    })
+    const makeStub = () =>
+      vi.fn(async (url: string, opts: RequestInit) => {
+        const u = String(url)
+        const method = opts?.method ?? 'GET'
+        if (method === 'POST' && u.includes('/messages')) {
+          postCallCount++
+          return new Response(JSON.stringify({ id: `msg-post-${postCallCount}` }), { status: 200 })
+        }
+        if (method === 'DELETE' && u.includes('/messages/')) {
+          const parts = u.split('/messages/')
+          deletedMsgIds.push(parts[parts.length - 1]!)
+          return new Response(null, { status: 204 })
+        }
+        return new Response(JSON.stringify([]), { status: 200 })
+      })
 
     vi.stubGlobal('fetch', makeStub())
     await runScheduledWork(db, TOKEN)
@@ -191,10 +198,13 @@ describe('scheduled work (e2e)', () => {
   it('does nothing when there are no leaderboard channels configured', async () => {
     const emptyDb = makeDb()
     let fetchCalled = false
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      fetchCalled = true
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        fetchCalled = true
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
 
     const result = await runScheduledWork(emptyDb, TOKEN)
     expect(result.isOk).toBe(true)
@@ -204,22 +214,44 @@ describe('scheduled work (e2e)', () => {
   it('processes each leaderboard channel independently', async () => {
     const LC2 = 'lc-e2e-scheduled-2'
     const MC2 = 'mc-e2e-scheduled-2'
-    upsertLeaderboardChannel(db, { channelId: LC2, guildId: GUILD_ID, channelName: '#lb2', addedByUserId: 'admin' })
+    upsertLeaderboardChannel(db, {
+      channelId: LC2,
+      guildId: GUILD_ID,
+      channelName: '#lb2',
+      addedByUserId: 'admin',
+    })
     addMonitoredChannel(db, { channelId: MC2, guildId: GUILD_ID, leaderboardChannelId: LC2 })
 
-    upsertUserStats(db, { channelId: MC_ID, userId: 'alice', username: 'alice', lastMusicPostAt: clock.now(), runCount: 3, highestRunSeen: 3 })
-    upsertUserStats(db, { channelId: MC2, userId: 'bob', username: 'bob', lastMusicPostAt: clock.now(), runCount: 7, highestRunSeen: 9 })
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'alice',
+      username: 'alice',
+      lastMusicPostAt: clock.now(),
+      runCount: 3,
+      highestRunSeen: 3,
+    })
+    upsertUserStats(db, {
+      channelId: MC2,
+      userId: 'bob',
+      username: 'bob',
+      lastMusicPostAt: clock.now(),
+      runCount: 7,
+      highestRunSeen: 9,
+    })
 
     const postedChannels: string[] = []
-    vi.stubGlobal('fetch', vi.fn(async (url: string, opts: RequestInit) => {
-      const u = String(url)
-      if (u.includes('/messages') && opts.method === 'POST') {
-        const ch = u.match(/channels\/([^/]+)\/messages/)?.[1]
-        if (ch) postedChannels.push(ch)
-        return new Response(JSON.stringify({ id: `msg-${ch}` }), { status: 200 })
-      }
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts: RequestInit) => {
+        const u = String(url)
+        if (u.includes('/messages') && opts.method === 'POST') {
+          const ch = u.match(/channels\/([^/]+)\/messages/)?.[1]
+          if (ch) postedChannels.push(ch)
+          return new Response(JSON.stringify({ id: `msg-${ch}` }), { status: 200 })
+        }
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -238,21 +270,24 @@ describe('scheduled work (e2e)', () => {
     const newMessage: DiscordMessage = makeDiscordMessage('msg-from-recovery', 'helen', t0)
     let recoveryCallCount = 0
 
-    vi.stubGlobal('fetch', vi.fn(async (url: string, opts: RequestInit) => {
-      const u = String(url)
-      const method = opts?.method ?? 'GET'
-      if (u.includes(`/channels/${MC_ID}/messages`) && method === 'GET') {
-        recoveryCallCount++
-        if (recoveryCallCount === 1) {
-          return new Response(JSON.stringify([newMessage]), { status: 200 })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts: RequestInit) => {
+        const u = String(url)
+        const method = opts?.method ?? 'GET'
+        if (u.includes(`/channels/${MC_ID}/messages`) && method === 'GET') {
+          recoveryCallCount++
+          if (recoveryCallCount === 1) {
+            return new Response(JSON.stringify([newMessage]), { status: 200 })
+          }
+          return new Response(JSON.stringify([]), { status: 200 })
+        }
+        if (method === 'POST' && u.includes('/messages')) {
+          return new Response(JSON.stringify({ id: 'posted-msg' }), { status: 200 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }
-      if (method === 'POST' && u.includes('/messages')) {
-        return new Response(JSON.stringify({ id: 'posted-msg' }), { status: 200 })
-      }
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+      }),
+    )
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -265,17 +300,20 @@ describe('scheduled work (e2e)', () => {
     seedUserStats(db, 'ivan', 5, 5)
 
     let deletedMsgId: string | null = null
-    vi.stubGlobal('fetch', vi.fn(async (url: string, opts: RequestInit) => {
-      const u = String(url)
-      if (u.includes('/messages') && opts.method === 'POST') {
-        return new Response(JSON.stringify({ id: 'posted-msg-ivan' }), { status: 200 })
-      }
-      if (u.match(/messages\/[^/]+$/) && opts.method === 'DELETE') {
-        deletedMsgId = u.split('/messages/')[1]
-        return new Response(null, { status: 204 })
-      }
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts: RequestInit) => {
+        const u = String(url)
+        if (u.includes('/messages') && opts.method === 'POST') {
+          return new Response(JSON.stringify({ id: 'posted-msg-ivan' }), { status: 200 })
+        }
+        if (u.match(/messages\/[^/]+$/) && opts.method === 'DELETE') {
+          deletedMsgId = u.split('/messages/')[1]
+          return new Response(null, { status: 204 })
+        }
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
 
     await runScheduledWork(db, TOKEN)
     const post = getLeaderboardPost(db, LC_ID)
@@ -299,17 +337,22 @@ describe('scheduled work (e2e)', () => {
       VALUES ('old-msg', ?, ?)
     `).run(MC_ID, oldDate)
 
-    vi.stubGlobal('fetch', vi.fn(async (url: string, opts: RequestInit) => {
-      const u = String(url)
-      if (u.includes('/messages') && opts.method === 'POST') {
-        return new Response(JSON.stringify({ id: 'new-post' }), { status: 200 })
-      }
-      return new Response(JSON.stringify([]), { status: 200 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts: RequestInit) => {
+        const u = String(url)
+        if (u.includes('/messages') && opts.method === 'POST') {
+          return new Response(JSON.stringify({ id: 'new-post' }), { status: 200 })
+        }
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
 
     await runScheduledWork(db, TOKEN)
 
-    const oldRow = db.prepare('SELECT 1 FROM processed_messages WHERE message_id = ?').get('old-msg')
+    const oldRow = db
+      .prepare('SELECT 1 FROM processed_messages WHERE message_id = ?')
+      .get('old-msg')
     expect(oldRow).toBeUndefined()
   })
 })

@@ -13,6 +13,7 @@ Wraps a synchronous callback in a `true-myth` `Result`. Returns `Result.ok(value
 Retries a DB operation up to `STANDARD_RETRY_OPTIONS.retries` (3) additional times, but **only** on transient SQLite errors (`SQLITE_BUSY`, `SQLITE_LOCKED`). Non-transient errors return immediately after the first attempt.
 
 **Behaviour**:
+
 - Returns on first success without retrying
 - Retries only when `result.error.message` contains `SQLITE_BUSY` or `SQLITE_LOCKED`
 - Total calls: up to 4 (1 initial + 3 retries)

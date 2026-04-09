@@ -20,7 +20,7 @@ describe('hasAdministratorPermission', () => {
   })
 
   it('handles large permission strings as BigInt correctly', () => {
-    const bigPerms = (2n ** 40n | 0x8n).toString()
+    const bigPerms = ((2n ** 40n) | 0x8n).toString()
     expect(hasAdministratorPermission(bigPerms)).toBe(true)
   })
 

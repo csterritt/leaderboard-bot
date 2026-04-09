@@ -82,6 +82,10 @@ describe('createShutdown', () => {
     const resources = makeResources()
     const shutdown = createShutdown(resources)
     shutdown()
-    expect(logSpy.mock.calls.some(([msg]) => typeof msg === 'string' && msg.toLowerCase().includes('shut'))).toBe(true)
+    expect(
+      logSpy.mock.calls.some(
+        ([msg]) => typeof msg === 'string' && msg.toLowerCase().includes('shut'),
+      ),
+    ).toBe(true)
   })
 })

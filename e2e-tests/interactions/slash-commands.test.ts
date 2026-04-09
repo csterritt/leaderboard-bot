@@ -140,7 +140,7 @@ describe('slash commands (e2e)', () => {
       const req = makeRequest(interaction)
       const resp = await handleInteractionWithVerifier(req, db, TOKEN, alwaysValidVerifier)
       expect(resp.status).toBe(200)
-      const body = await extractResponseBody(resp) as { data?: { content?: string } }
+      const body = (await extractResponseBody(resp)) as { data?: { content?: string } }
       expect(body.data?.content).toContain('Administrator')
 
       const lc = getLeaderboardChannel(db, 'ch-lb')
@@ -157,7 +157,7 @@ describe('slash commands (e2e)', () => {
       const req = makeRequest(interaction)
       const resp = await handleInteractionWithVerifier(req, db, TOKEN, alwaysValidVerifier)
       expect(resp.status).toBe(200)
-      const body = await extractResponseBody(resp) as { data?: { content?: string } }
+      const body = (await extractResponseBody(resp)) as { data?: { content?: string } }
       expect(body.data?.content).toContain('guild')
     })
 
@@ -192,7 +192,12 @@ describe('slash commands (e2e)', () => {
       seedLeaderboardAndMonitor(db)
 
       const interaction = adminInteraction(LC_ID, 'removeleaderboardchannel')
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
 
       const lc = getLeaderboardChannel(db, LC_ID)
@@ -204,7 +209,12 @@ describe('slash commands (e2e)', () => {
 
     it('succeeds even if the channel was not a leaderboard channel', async () => {
       const interaction = adminInteraction('ch-not-lb', 'removeleaderboardchannel')
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
     })
   })
@@ -231,7 +241,12 @@ describe('slash commands (e2e)', () => {
           options: [{ name: 'channel', value: MC_ID }],
         },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
 
       const channels = getMonitoredChannels(db)
@@ -250,9 +265,14 @@ describe('slash commands (e2e)', () => {
           options: [{ name: 'channel', value: 'mc-x' }],
         },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
-      const body = await extractResponseBody(resp) as { data?: { content?: string } }
+      const body = (await extractResponseBody(resp)) as { data?: { content?: string } }
       expect(body.data?.content).toContain('setleaderboardchannel')
 
       const channels = getMonitoredChannels(db)
@@ -280,7 +300,12 @@ describe('slash commands (e2e)', () => {
       }
 
       await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
-      const resp = await handleInteractionWithVerifier(makeRequest({ ...interaction, id: 'i-dup-2' }), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest({ ...interaction, id: 'i-dup-2' }),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
 
       const channels = getMonitoredChannels(db)
@@ -305,7 +330,12 @@ describe('slash commands (e2e)', () => {
           options: [{ name: 'channel', value: MC_ID }],
         },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
 
       const channels = getMonitoredChannels(db)
@@ -339,9 +369,16 @@ describe('slash commands (e2e)', () => {
         member: { nick: null, permissions: ADMIN_PERMS },
         data: { name: 'leaderboard' },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
-      const body = await extractResponseBody(resp) as { data?: { content?: string; flags?: number } }
+      const body = (await extractResponseBody(resp)) as {
+        data?: { content?: string; flags?: number }
+      }
       expect(body.data?.flags).toBe(64)
       expect(body.data?.content).toContain('Alice')
     })
@@ -356,9 +393,14 @@ describe('slash commands (e2e)', () => {
         member: { nick: null, permissions: ADMIN_PERMS },
         data: { name: 'leaderboard' },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
-      const body = await extractResponseBody(resp) as { data?: { content?: string } }
+      const body = (await extractResponseBody(resp)) as { data?: { content?: string } }
       expect(body.data?.content).toContain('not a leaderboard channel')
     })
 
@@ -379,8 +421,13 @@ describe('slash commands (e2e)', () => {
         member: { nick: null, permissions: ADMIN_PERMS },
         data: { name: 'leaderboard' },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
-      const body = await extractResponseBody(resp) as { data?: { content?: string } }
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
+      const body = (await extractResponseBody(resp)) as { data?: { content?: string } }
       expect(body.data?.content).toContain('No monitored channel')
     })
 
@@ -396,8 +443,13 @@ describe('slash commands (e2e)', () => {
         member: { nick: null, permissions: ADMIN_PERMS },
         data: { name: 'leaderboard' },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(interaction), db, TOKEN, alwaysValidVerifier)
-      const body = await extractResponseBody(resp) as { data?: { flags?: number } }
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
+      const body = (await extractResponseBody(resp)) as { data?: { flags?: number } }
       expect(body.data?.flags).toBe(64)
     })
   })
@@ -446,7 +498,9 @@ describe('slash commands (e2e)', () => {
 
       await handleInteractionWithVerifier(
         makeRequest(adminInteraction(NEW_LC, 'setleaderboardchannel')),
-        db, TOKEN, alwaysValidVerifier,
+        db,
+        TOKEN,
+        alwaysValidVerifier,
       )
 
       await handleInteractionWithVerifier(
@@ -458,7 +512,9 @@ describe('slash commands (e2e)', () => {
           member: { nick: null, permissions: ADMIN_PERMS },
           data: { name: 'addmonitoredchannel', options: [{ name: 'channel', value: NEW_MC }] },
         }),
-        db, TOKEN, alwaysValidVerifier,
+        db,
+        TOKEN,
+        alwaysValidVerifier,
       )
 
       upsertUserStats(db, {
@@ -479,9 +535,14 @@ describe('slash commands (e2e)', () => {
         member: { nick: null, permissions: ADMIN_PERMS },
         data: { name: 'leaderboard' },
       }
-      const resp = await handleInteractionWithVerifier(makeRequest(lbInteraction), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(lbInteraction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
       expect(resp.status).toBe(200)
-      const body = await extractResponseBody(resp) as { data?: { content?: string } }
+      const body = (await extractResponseBody(resp)) as { data?: { content?: string } }
       expect(body.data?.content).toContain('WorkflowUser')
     })
   })

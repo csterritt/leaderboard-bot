@@ -10,13 +10,17 @@ describe('toResult', () => {
   })
 
   it('returns Result.err(Error) when the callback throws an Error', () => {
-    const result = toResult(() => { throw new Error('boom') })
+    const result = toResult(() => {
+      throw new Error('boom')
+    })
     expect(result.isErr).toBe(true)
     expect((result.error as Error).message).toBe('boom')
   })
 
   it('wraps a non-Error thrown value in an Error', () => {
-    const result = toResult(() => { throw 'string error' })
+    const result = toResult(() => {
+      throw 'string error'
+    })
     expect(result.isErr).toBe(true)
     expect(result.error).toBeInstanceOf(Error)
   })
@@ -33,9 +37,7 @@ describe('withRetry', () => {
 
   it('retries when the inner operation returns SQLITE_BUSY', () => {
     const busyError = new Error('SQLITE_BUSY: database is locked')
-    const op = vi.fn()
-      .mockReturnValueOnce(Result.err(busyError))
-      .mockReturnValueOnce(Result.ok(99))
+    const op = vi.fn().mockReturnValueOnce(Result.err(busyError)).mockReturnValueOnce(Result.ok(99))
     const result = withRetry('test', op)
     expect(result.isOk).toBe(true)
     expect(result.value).toBe(99)
@@ -44,7 +46,8 @@ describe('withRetry', () => {
 
   it('retries when the inner operation returns SQLITE_LOCKED', () => {
     const lockedError = new Error('SQLITE_LOCKED: table is locked')
-    const op = vi.fn()
+    const op = vi
+      .fn()
       .mockReturnValueOnce(Result.err(lockedError))
       .mockReturnValueOnce(Result.ok(42))
     const result = withRetry('test', op)

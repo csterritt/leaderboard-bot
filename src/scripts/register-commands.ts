@@ -34,7 +34,8 @@ const commands = [
   },
   {
     name: 'addmonitoredchannel',
-    description: 'Add a channel to monitor for music uploads, linked to the current leaderboard channel',
+    description:
+      'Add a channel to monitor for music uploads, linked to the current leaderboard channel',
     options: [
       {
         name: 'channel',

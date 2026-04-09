@@ -24,7 +24,12 @@ export const verifyDiscordSignature = async ({
       ['verify'],
     )
 
-    return await crypto.subtle.verify('Ed25519', cryptoKey, sigBytes.buffer as ArrayBuffer, messageBytes.buffer as ArrayBuffer)
+    return await crypto.subtle.verify(
+      'Ed25519',
+      cryptoKey,
+      sigBytes.buffer as ArrayBuffer,
+      messageBytes.buffer as ArrayBuffer,
+    )
   } catch {
     return false
   }

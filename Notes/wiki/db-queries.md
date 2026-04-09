@@ -32,7 +32,7 @@ All exported database operations for the leaderboard bot. Every function follows
 ## Monitored Channels
 
 - `getMonitoredChannels(db)` — all rows.
-- `addMonitoredChannel(db, channel)` — insert with `ON CONFLICT(channel_id) DO NOTHING` (idempotent for the same channel). Attempting to link a *different* monitored channel to a leaderboard that already has one fails with a UNIQUE constraint error on `leaderboard_channel_id`.
+- `addMonitoredChannel(db, channel)` — insert with `ON CONFLICT(channel_id) DO NOTHING` (idempotent for the same channel). Attempting to link a _different_ monitored channel to a leaderboard that already has one fails with a UNIQUE constraint error on `leaderboard_channel_id`.
 - `deleteMonitoredChannel(db, channelId)` — removes the row.
 - `isMonitoredChannel(db, channelId)` — `boolean` existence check.
 - `getMonitoredChannelByLeaderboard(db, leaderboardChannelId)` — the single monitored channel linked to a leaderboard channel, or `null`.

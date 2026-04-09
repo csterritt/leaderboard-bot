@@ -21,7 +21,11 @@ function makeFetchMock(responses: Array<() => Response>): ReturnType<typeof vi.f
   })
 }
 
-function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+function jsonResponse(
+  status: number,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -165,9 +169,12 @@ describe('sendMessage', () => {
   })
 
   it('returns Result.err when fetch throws', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      throw new Error('network down')
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network down')
+      }),
+    )
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hi')
     await vi.runAllTimersAsync()
@@ -302,9 +309,7 @@ describe('fetchChannel', () => {
   })
 
   it('returns Result.ok({ id, name }) on success', async () => {
-    const mockFetch = makeFetchMock([
-      () => jsonResponse(200, { id: CHANNEL_ID, name: 'my-music' }),
-    ])
+    const mockFetch = makeFetchMock([() => jsonResponse(200, { id: CHANNEL_ID, name: 'my-music' })])
     vi.stubGlobal('fetch', mockFetch)
 
     const p = fetchChannel(TOKEN, CHANNEL_ID)

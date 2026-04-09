@@ -35,7 +35,7 @@ const isTransientSqliteError = (error: Error): boolean =>
 
 const withRetry = <T>(
   operationName: string,
-  operation: () => Result<T, Error>
+  operation: () => Result<T, Error>,
 ): Result<T, Error> => {
   let lastError: Error | undefined
 
@@ -70,14 +70,14 @@ const toResult = <T>(fn: () => T): Result<T, Error> => {
 export const getUserStats = (
   db: Database,
   channelId: string,
-  userId: string
+  userId: string,
 ): Result<UserStats | null, Error> =>
   withRetry('getUserStats', () => getUserStatsActual(db, channelId, userId))
 
 const getUserStatsActual = (
   db: Database,
   channelId: string,
-  userId: string
+  userId: string,
 ): Result<UserStats | null, Error> =>
   toResult(() => {
     const row = db
@@ -89,6 +89,7 @@ const getUserStatsActual = (
 ```
 
 **Key rules:**
+
 - `withRetry` wraps every exported DB function.
 - `withRetry` retries only when the inner function returns `Result.err` for known transient SQLite lock conditions (`SQLITE_BUSY`, `SQLITE_LOCKED`).
 - Non-transient DB errors are returned immediately without retry.
@@ -348,6 +349,7 @@ This service is the single authoritative path for message ingestion used by both
 Uses `fetch` directly. Tests use request interception. All requests go through a shared `discordFetch` wrapper that enforces rate-limit discipline.
 
 **Rate-limit strategy:**
+
 - Maintain a minimum delay of **1 100 ms** between consecutive Discord API requests (stays well within 5 requests / 5 seconds).
 - On a `429` response, read the `Retry-After` header (seconds), wait that duration, then retry the request once.
 - On a second consecutive `429`, return `Result.err` and let the caller decide.
@@ -557,7 +559,8 @@ const commands = [
   },
   {
     name: 'addmonitoredchannel',
-    description: 'Add a channel to monitor for music uploads, linked to the current leaderboard channel',
+    description:
+      'Add a channel to monitor for music uploads, linked to the current leaderboard channel',
     options: [
       {
         name: 'channel',
@@ -584,8 +587,8 @@ const commands = [
 ]
 ```
 
-  - Run via `bun run src/scripts/register-commands.ts`
-  - Uses `PUT /applications/{application_id}/commands` for bulk overwrite
+- Run via `bun run src/scripts/register-commands.ts`
+- Uses `PUT /applications/{application_id}/commands` for bulk overwrite
 
 - [ ] **12.2** Create the database file and apply the schema
 - [ ] **12.3** Set environment variables: `DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`, `DISCORD_APPLICATION_ID`, `DATABASE_PATH`

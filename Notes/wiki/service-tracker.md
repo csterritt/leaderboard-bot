@@ -17,6 +17,7 @@ computeNewStats(
 Computes the updated `UserStats` for a user after a new music post arrives.
 
 **Logic:**
+
 - `existing === null` (first post): `runCount = 1`, `highestRunSeen = 1`, `lastMusicPostAt = newPostTimestamp`.
 - Computes `deltaSecs = newPostTimestamp - lastMusicPostAt` (negative if out of order).
 - Delegates to `computeStreakDelta` for classification (`noop` / `increment` / `reset`).

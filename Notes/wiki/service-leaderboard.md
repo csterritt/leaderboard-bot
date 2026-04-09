@@ -15,11 +15,13 @@ Formats a leaderboard for Discord. Produces output ≤ 2000 characters (Discord 
 **Empty:** Returns header + `_No data yet. Start posting music!_`
 
 **Rows:** Ranked `#1`, `#2`, … with format:
+
 ```
 #N **<username>** — streak: <runCount> (best: <highestRunSeen>)
 ```
 
 **Username safety:** Usernames are passed through `escapeUsername` before rendering:
+
 - Replaces `|` and backtick characters with spaces (prevents table/code injection).
 - Truncates to 32 characters (with `…` suffix) to bound output length.
 

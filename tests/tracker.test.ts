@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { computeNewStats, hasMusicAttachment, resolveUsername } from '../src/services/tracker'
-import type { UserStats, NormalizedAttachment, NormalizedAuthor, NormalizedMember } from '../src/types'
+import type {
+  UserStats,
+  NormalizedAttachment,
+  NormalizedAuthor,
+  NormalizedMember,
+} from '../src/types'
 
 // ─── computeNewStats ─────────────────────────────────────────────────────────
 

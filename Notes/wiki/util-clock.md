@@ -35,7 +35,7 @@ clock.set(1_700_000_000)
 
 processMessage(db, makeMsg({ id: 'msg-1', timestampSecs: clock.now() }))
 
-clock.advance(12 * 3600)  // simulate 12 hours passing
+clock.advance(12 * 3600) // simulate 12 hours passing
 processMessage(db, makeMsg({ id: 'msg-2', timestampSecs: clock.now() }))
 ```
 

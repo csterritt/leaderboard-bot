@@ -40,26 +40,20 @@ describe('formatLeaderboard', () => {
   })
 
   it('usernames containing pipes are escaped or normalized safely', () => {
-    const rows: LeaderboardRow[] = [
-      { username: 'Alice|Bob', runCount: 1, highestRunSeen: 1 },
-    ]
+    const rows: LeaderboardRow[] = [{ username: 'Alice|Bob', runCount: 1, highestRunSeen: 1 }]
     const result = formatLeaderboard('music', rows)
     expect(result).not.toMatch(/\|.*\|.*\|/)
   })
 
   it('usernames containing backticks are escaped or normalized safely', () => {
-    const rows: LeaderboardRow[] = [
-      { username: 'hack`rm -rf`er', runCount: 1, highestRunSeen: 1 },
-    ]
+    const rows: LeaderboardRow[] = [{ username: 'hack`rm -rf`er', runCount: 1, highestRunSeen: 1 }]
     const result = formatLeaderboard('music', rows)
     const inlineCodeCount = (result.match(/`/g) ?? []).length
     expect(inlineCodeCount % 2).toBe(0)
   })
 
   it('long display names are handled without breaking the output', () => {
-    const rows: LeaderboardRow[] = [
-      { username: 'A'.repeat(100), runCount: 1, highestRunSeen: 1 },
-    ]
+    const rows: LeaderboardRow[] = [{ username: 'A'.repeat(100), runCount: 1, highestRunSeen: 1 }]
     const result = formatLeaderboard('music', rows)
     expect(result.length).toBeLessThanOrEqual(DISCORD_MESSAGE_LIMIT)
   })

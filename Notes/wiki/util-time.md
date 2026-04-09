@@ -12,13 +12,13 @@ Converts a Discord ISO8601 timestamp string to a Unix seconds integer. Handles t
 
 Classifies the time gap between consecutive music posts:
 
-| Input | Output |
-|---|---|
-| `null` | `'first'` — no prior post |
-| negative → clamped to `0` | `'noop'` |
-| `0 – 28_800` (≤ 8h) | `'noop'` |
-| `28_801 – 129_600` (8h–36h] | `'increment'` |
-| `> 129_600` (> 36h) | `'reset'` |
+| Input                       | Output                    |
+| --------------------------- | ------------------------- |
+| `null`                      | `'first'` — no prior post |
+| negative → clamped to `0`   | `'noop'`                  |
+| `0 – 28_800` (≤ 8h)         | `'noop'`                  |
+| `28_801 – 129_600` (8h–36h] | `'increment'`             |
+| `> 129_600` (> 36h)         | `'reset'`                 |
 
 Negative deltas are clamped to `0` before classification (handles out-of-order message delivery).
 

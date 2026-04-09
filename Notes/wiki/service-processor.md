@@ -27,11 +27,13 @@ processMessage(db: Database, message: NormalizedMessage): Result<boolean, Error>
 Single transactional message-processing path.
 
 **Returns:**
+
 - `Result.ok(true)` — message was processed and stats updated.
 - `Result.ok(false)` — message was filtered/skipped (bot, wrong type, no music attachment, non-monitored channel, already claimed).
 - `Result.err` — DB failure; transaction was rolled back so no partial state remains.
 
 **Algorithm:**
+
 1. Early-exit filters (bot, message type, no music attachment) — no DB touch.
 2. `isMonitoredChannel(db, channelId)` — skip if not monitored.
 3. Open SQLite transaction:

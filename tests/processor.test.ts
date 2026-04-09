@@ -2,8 +2,17 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { processMessage, normalizeGatewayMessage, normalizeDiscordMessage } from '../src/services/processor'
-import { addMonitoredChannel, upsertLeaderboardChannel, getUserStats, hasProcessedMessage } from '../src/db/queries'
+import {
+  processMessage,
+  normalizeGatewayMessage,
+  normalizeDiscordMessage,
+} from '../src/services/processor'
+import {
+  addMonitoredChannel,
+  upsertLeaderboardChannel,
+  getUserStats,
+  hasProcessedMessage,
+} from '../src/db/queries'
 import type { Database as DatabaseType, NormalizedMessage, DiscordMessage } from '../src/types'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf8')
@@ -122,9 +131,7 @@ describe('normalizeGatewayMessage', () => {
       author: { id: 'ua', username: 'eve', globalName: 'Eve', bot: false },
       member: { nickname: 'E-Nick', permissions: { has: () => true } },
       createdTimestamp: 1704067200000,
-      attachments: new Map([
-        ['att-1', { name: 'beat.wav', contentType: 'audio/wav' }],
-      ]),
+      attachments: new Map([['att-1', { name: 'beat.wav', contentType: 'audio/wav' }]]),
       type: 0,
     }
     const msg = normalizeGatewayMessage(gatewayMsg)
@@ -202,7 +209,9 @@ describe('processMessage', () => {
   })
 
   it('ignores bot messages (author.isBot === true)', () => {
-    const msg = makeMsg({ author: { id: USER_ID, username: 'bot', globalName: null, isBot: true } })
+    const msg = makeMsg({
+      author: { id: USER_ID, username: 'bot', globalName: null, isBot: true },
+    })
     const result = processMessage(db, msg)
     expect(result.isOk).toBe(true)
     expect(result.value).toBe(false)

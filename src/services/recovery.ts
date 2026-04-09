@@ -1,9 +1,5 @@
 import { Result } from 'true-myth'
-import {
-  getRecoveryState,
-  upsertRecoveryState,
-  getMonitoredChannels,
-} from '../db/queries'
+import { getRecoveryState, upsertRecoveryState, getMonitoredChannels } from '../db/queries'
 import { fetchMessagesAfter } from './discord'
 import { processMessage } from './processor'
 import { normalizeDiscordMessage } from './processor'

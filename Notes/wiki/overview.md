@@ -3,6 +3,7 @@
 ## Purpose
 
 A Discord bot that:
+
 - Receives `MESSAGE_CREATE` events via `discord.js` gateway
 - Handles slash commands via Discord Interactions HTTP endpoint
 - Tracks per-user music posting streaks, scoped to each monitored channel
@@ -11,14 +12,14 @@ A Discord bot that:
 
 ## Runtime / Stack
 
-| Concern | Choice |
-|---|---|
-| Runtime | Bun |
-| Database | better-sqlite3 (synchronous, Node native module) |
+| Concern         | Choice                                                     |
+| --------------- | ---------------------------------------------------------- |
+| Runtime         | Bun                                                        |
+| Database        | better-sqlite3 (synchronous, Node native module)           |
 | Discord library | discord.js (handles gateway, heartbeat, reconnect, resume) |
-| Testing | vitest with in-memory better-sqlite3 databases |
-| Result type | true-myth `Result<T, Error>` |
-| Language | TypeScript (strict mode, bundler moduleResolution) |
+| Testing         | vitest with in-memory better-sqlite3 databases             |
+| Result type     | true-myth `Result<T, Error>`                               |
+| Language        | TypeScript (strict mode, bundler moduleResolution)         |
 
 ## Key Design Decisions
 

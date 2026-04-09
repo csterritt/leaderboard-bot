@@ -11,6 +11,7 @@ Slash commands are handled through Discord Interactions over HTTP, while message
 ## System Architecture
 
 ### Tech Stack
+
 - **Runtime**: Bun
 - **Gateway Layer**: discord.js (handles gateway lifecycle)
 - **HTTP Interface**: Discord Interactions endpoint for slash commands
@@ -21,6 +22,7 @@ Slash commands are handled through Discord Interactions over HTTP, while message
 ### Core Components
 
 #### 1. Main App Structure
+
 ```
 src/
 ├── index.ts                 # Main entry point, discord.js client setup, scheduled jobs
@@ -168,6 +170,7 @@ Update last_music_post_at = T_now
 #### 5. Slash Commands
 
 **`/leaderboard [channel]`**
+
 - Shows the music leaderboard for a leaderboard channel
 - Defaults to the current channel when no option is provided
 - Verifies the target channel is in `leaderboard_channels`; returns an error if not
@@ -179,6 +182,7 @@ Update last_music_post_at = T_now
 - Returns an ephemeral response
 
 **`/setleaderboardchannel`**
+
 - Takes no arguments; operates on the current channel
 - Marks the current channel as a leaderboard channel
 - Does **not** add it to `monitored_channels` (monitored channels are managed separately)
@@ -187,6 +191,7 @@ Update last_music_post_at = T_now
 - Responds with confirmation or permission denied error
 
 **`/removeleaderboardchannel`**
+
 - Takes no arguments; operates on the current channel
 - Removes the current channel from `leaderboard_channels`
 - Removes all `monitored_channels` rows that reference this leaderboard channel
@@ -196,6 +201,7 @@ Update last_music_post_at = T_now
 - Responds with confirmation or permission denied error
 
 **`/addmonitoredchannel <channel>`**
+
 - Takes one required argument: the channel to monitor for music uploads
 - Must be run from a leaderboard channel (the current channel must be in `leaderboard_channels`)
 - Adds the provided channel to `monitored_channels` with `leaderboard_channel_id` set to the current channel
@@ -204,6 +210,7 @@ Update last_music_post_at = T_now
 - Responds with confirmation or permission denied error
 
 **`/removemonitoredchannel <channel>`**
+
 - Takes one required argument: the channel to stop monitoring
 - Removes the provided channel from `monitored_channels`
 - Does not delete historical `user_stats`, `recovery_state`, or `processed_messages` rows
@@ -211,6 +218,7 @@ Update last_music_post_at = T_now
 - Responds with confirmation or permission denied error
 
 **Response Format**:
+
 ```
 🎵 Music Leaderboard for #channel-name 🎵
 
@@ -222,6 +230,7 @@ Rank | User | Current Run | Best Run
 ```
 
 **Query** (per monitored channel, then merged across all monitored channels for a leaderboard):
+
 ```sql
 SELECT
     username,
@@ -238,6 +247,7 @@ LIMIT 50;
 **Timer**: `setInterval` or `node-cron`, every hour
 
 **Flow**:
+
 ```
 Hourly Timer → runScheduledWork
     ↓
@@ -265,6 +275,7 @@ Each configured leaderboard channel is tracked independently. There is no single
 #### 7. Message Recovery
 
 **Flow** (runs during scheduled work):
+
 ```
 For each monitored_channels entry:
     ├─ Read recovery_state.last_processed_message_id
@@ -285,7 +296,9 @@ If a batch partially fails, the stored checkpoint remains at the last successful
 ## Key Implementation Details
 
 ### Time Calculations
+
 Use **Discord message timestamps** for all streak comparisons:
+
 - Parse `message.timestamp` from ISO8601 to Unix seconds
 - 8 hours = 28,800 seconds
 - 36 hours = 129,600 seconds
@@ -293,9 +306,11 @@ Use **Discord message timestamps** for all streak comparisons:
 **Why**: This avoids drift between the runtime, database, and Discord.
 
 ### Idempotent Message Processing
+
 The system must prevent double-processing when the same message is seen via both the live gateway path and the recovery path.
 
 The write path should guarantee that message claiming and stat mutation are serialized together. Since better-sqlite3 is synchronous and single-threaded, transactions provide natural serialization. The required behavior is:
+
 - a message ID is processed at most once
 - a failed attempt does not advance `recovery_state` past the failure point
 - recovery can safely re-fetch already seen messages without corrupting streak counts
@@ -303,6 +318,7 @@ The write path should guarantee that message claiming and stat mutation are seri
 Rows in `processed_messages` older than 14 days are pruned during scheduled work to prevent unbounded table growth.
 
 ### Leaderboard Post Replacement
+
 When deleting a previous leaderboard message:
 
 - `404` means the message is already gone and should not block a new post
@@ -310,32 +326,40 @@ When deleting a previous leaderboard message:
 - the new post should still be attempted unless the failure indicates a fatal permissions issue
 
 ### Content Hashing
+
 Leaderboard content is hashed using **FNV-1a** (fast, non-cryptographic) to detect changes. Only post a new message when the hash differs from the stored `content_hash` in `leaderboard_posts`.
 
 ### Discord API Rate Limiting
+
 The Discord REST API client enforces:
+
 - A minimum delay of **1 100 ms** between consecutive requests (stays within 5 requests / 5 seconds)
 - On a `429` response, reads `Retry-After` header, waits that duration, then retries once
 - On a second consecutive `429`, returns `Result.err`
 
 ### Channel Name Source of Truth
+
 Scheduled leaderboard posts use the `channel_name` stored in `leaderboard_channels`.
 
 That stored value is refreshed each time `/setleaderboardchannel` is run for the channel.
 
 ### Permission Verification for Channel Management
+
 All admin commands (`/setleaderboardchannel`, `/removeleaderboardchannel`, `/addmonitoredchannel`, `/removemonitoredchannel`) are restricted to members with the `ADMINISTRATOR` permission.
 
 The interaction payload exposes permissions as a bitfield string. The handler parses that string to a `BigInt` and tests with bitwise AND against `ADMINISTRATOR_PERMISSION` (`0x8n`).
 
 ### Message Type Filtering
+
 Only `DEFAULT` (type 0) and `REPLY` (type 19) messages are processed. All other message types are ignored.
 
 ### Music Attachment Detection
+
 1. Primary check: file extension from `filename` against `MUSIC_EXTENSIONS`
 2. Fallback: if `filename` is absent, check `content_type` starts with `audio/`
 
 ### Environment Variables
+
 ```bash
 DISCORD_APPLICATION_ID=xxx
 DISCORD_PUBLIC_KEY=xxx
@@ -346,10 +370,12 @@ DATABASE_PATH=./data/leaderboard.db
 ## Deployment
 
 ### Prerequisites
+
 - Bun runtime installed on the target machine
 - A persistent filesystem for the SQLite database
 
 ### Discord App Setup
+
 1. Create the app at https://discord.com/developers/applications
 2. Enable the **Message Content** privileged intent
 3. Enable the Gateway intents: `GUILDS`, `GUILD_MESSAGES`, `MESSAGE_CONTENT`

@@ -8,12 +8,7 @@ import {
   claimProcessedMessage,
 } from '../db/queries'
 import { hasMusicAttachment, computeNewStats, resolveUsername } from './tracker'
-import type {
-  Database,
-  NormalizedMessage,
-  NormalizedAttachment,
-  DiscordMessage,
-} from '../types'
+import type { Database, NormalizedMessage, NormalizedAttachment, DiscordMessage } from '../types'
 
 // ─── 4.1 Normalization helpers ────────────────────────────────────────────────
 
@@ -27,9 +22,7 @@ export const normalizeDiscordMessage = (raw: DiscordMessage): NormalizedMessage 
     globalName: raw.author.global_name,
     isBot: raw.author.bot === true,
   },
-  member: raw.member
-    ? { nick: raw.member.nick }
-    : undefined,
+  member: raw.member ? { nick: raw.member.nick } : undefined,
   timestamp: raw.timestamp,
   attachments: raw.attachments.map((a) => ({
     filename: a.filename,
@@ -84,9 +77,7 @@ export const normalizeGatewayMessage = (raw: GatewayMessage): NormalizedMessage 
       globalName: raw.author.globalName,
       isBot: raw.author.bot === true,
     },
-    member: raw.member
-      ? { nick: raw.member.nickname ?? null }
-      : undefined,
+    member: raw.member ? { nick: raw.member.nickname ?? null } : undefined,
     timestamp: new Date(raw.createdTimestamp).toISOString(),
     attachments,
     type: raw.type,

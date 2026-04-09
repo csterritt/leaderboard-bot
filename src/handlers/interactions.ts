@@ -25,7 +25,9 @@ const ephemeralMessage = (content: string) => ({
 
 const guildGuard = (interaction: DiscordInteraction): Response | null => {
   if (!interaction.guild_id || !interaction.member) {
-    return Response.json(ephemeralMessage('This command can only be used inside a guild.'), { status: 200 })
+    return Response.json(ephemeralMessage('This command can only be used inside a guild.'), {
+      status: 200,
+    })
   }
   return null
 }
@@ -33,14 +35,21 @@ const guildGuard = (interaction: DiscordInteraction): Response | null => {
 const adminGuard = (interaction: DiscordInteraction): Response | null => {
   const perms = interaction.member?.permissions
   if (!perms || !hasAdministratorPermission(perms)) {
-    return Response.json(ephemeralMessage('You need the Administrator permission to use this command.'), { status: 200 })
+    return Response.json(
+      ephemeralMessage('You need the Administrator permission to use this command.'),
+      { status: 200 },
+    )
   }
   return null
 }
 
 // ─── Command handlers ─────────────────────────────────────────────────────────
 
-async function handleLeaderboard(interaction: DiscordInteraction, db: Database, token: string): Promise<Response> {
+async function handleLeaderboard(
+  interaction: DiscordInteraction,
+  db: Database,
+  token: string,
+): Promise<Response> {
   const channelOption = interaction.data?.options?.find((o) => o.name === 'channel')
   let targetChannelId = interaction.channel_id
   let targetChannelName = interaction.channel?.name ?? targetChannelId
@@ -50,10 +59,9 @@ async function handleLeaderboard(interaction: DiscordInteraction, db: Database, 
     if (targetChannelId !== interaction.channel_id) {
       const fetchResult = await fetchChannel(token, targetChannelId)
       if (!fetchResult.isOk) {
-        return Response.json(
-          ephemeralMessage(`Failed to fetch channel information.`),
-          { status: 200 },
-        )
+        return Response.json(ephemeralMessage(`Failed to fetch channel information.`), {
+          status: 200,
+        })
       }
       targetChannelName = fetchResult.value.name
     }
@@ -62,16 +70,16 @@ async function handleLeaderboard(interaction: DiscordInteraction, db: Database, 
   const lcResult = getLeaderboardChannel(db, targetChannelId)
   if (!lcResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
   if (!lcResult.value) {
-    return Response.json(
-      ephemeralMessage(`<#${targetChannelId}> is not a leaderboard channel.`),
-      { status: 200 },
-    )
+    return Response.json(ephemeralMessage(`<#${targetChannelId}> is not a leaderboard channel.`), {
+      status: 200,
+    })
   }
 
   const channelName = targetChannelName ?? lcResult.value.channelName
 
   const monitoredResult = getMonitoredChannelByLeaderboard(db, targetChannelId)
-  if (!monitoredResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
+  if (!monitoredResult.isOk)
+    return Response.json(ephemeralMessage('Database error.'), { status: 200 })
   if (!monitoredResult.value) {
     return Response.json(
       ephemeralMessage(`No monitored channel is linked to <#${targetChannelId}> yet.`),
@@ -95,13 +103,17 @@ function handleSetLeaderboardChannel(interaction: DiscordInteraction, db: Databa
   const guildId = interaction.guild_id!
   const userId = interaction.member?.user?.id ?? 'unknown'
 
-  const result = upsertLeaderboardChannel(db, { channelId, guildId, channelName, addedByUserId: userId })
+  const result = upsertLeaderboardChannel(db, {
+    channelId,
+    guildId,
+    channelName,
+    addedByUserId: userId,
+  })
   if (!result.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
 
-  return Response.json(
-    ephemeralMessage(`<#${channelId}> has been set as a leaderboard channel.`),
-    { status: 200 },
-  )
+  return Response.json(ephemeralMessage(`<#${channelId}> has been set as a leaderboard channel.`), {
+    status: 200,
+  })
 }
 
 function handleRemoveLeaderboardChannel(interaction: DiscordInteraction, db: Database): Response {
@@ -111,7 +123,8 @@ function handleRemoveLeaderboardChannel(interaction: DiscordInteraction, db: Dat
   const channelId = interaction.channel_id
 
   const deletePostResult = deleteLeaderboardPost(db, channelId)
-  if (!deletePostResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
+  if (!deletePostResult.isOk)
+    return Response.json(ephemeralMessage('Database error.'), { status: 200 })
 
   const deleteResult = deleteLeaderboardChannel(db, channelId)
   if (!deleteResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
@@ -147,7 +160,8 @@ function handleAddMonitoredChannel(interaction: DiscordInteraction, db: Database
   const monitoredChannelId = String(channelOption.value)
 
   const existingResult = getMonitoredChannelByLeaderboard(db, leaderboardChannelId)
-  if (!existingResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
+  if (!existingResult.isOk)
+    return Response.json(ephemeralMessage('Database error.'), { status: 200 })
   if (existingResult.value && existingResult.value.channelId !== monitoredChannelId) {
     return Response.json(
       ephemeralMessage(
@@ -157,7 +171,11 @@ function handleAddMonitoredChannel(interaction: DiscordInteraction, db: Database
     )
   }
 
-  const addResult = addMonitoredChannel(db, { channelId: monitoredChannelId, guildId, leaderboardChannelId })
+  const addResult = addMonitoredChannel(db, {
+    channelId: monitoredChannelId,
+    guildId,
+    leaderboardChannelId,
+  })
   if (!addResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
 
   return Response.json(
@@ -179,15 +197,18 @@ function handleRemoveMonitoredChannel(interaction: DiscordInteraction, db: Datab
   const deleteResult = deleteMonitoredChannel(db, monitoredChannelId)
   if (!deleteResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
 
-  return Response.json(
-    ephemeralMessage(`<#${monitoredChannelId}> is no longer being monitored.`),
-    { status: 200 },
-  )
+  return Response.json(ephemeralMessage(`<#${monitoredChannelId}> is no longer being monitored.`), {
+    status: 200,
+  })
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-async function routeInteraction(interaction: DiscordInteraction, db: Database, token: string): Promise<Response> {
+async function routeInteraction(
+  interaction: DiscordInteraction,
+  db: Database,
+  token: string,
+): Promise<Response> {
   if (interaction.type === 1) {
     return Response.json({ type: 1 }, { status: 200 })
   }

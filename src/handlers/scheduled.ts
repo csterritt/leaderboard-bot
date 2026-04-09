@@ -37,7 +37,11 @@ export const runScheduledWork = async (
 
     if (!monitoredResult.value) {
       if (existingPostResult.value) {
-        const delResult = await deleteMessage(token, lc.channelId, existingPostResult.value.messageId)
+        const delResult = await deleteMessage(
+          token,
+          lc.channelId,
+          existingPostResult.value.messageId,
+        )
         if (!delResult.isOk) return Result.err(delResult.error)
         const dbDelResult = deleteLeaderboardPost(db, lc.channelId)
         if (!dbDelResult.isOk) return Result.err(dbDelResult.error)

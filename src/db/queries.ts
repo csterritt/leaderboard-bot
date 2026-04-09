@@ -106,10 +106,7 @@ export const getUserStats = (
 
 // ─── 2.2 upsertUserStats ─────────────────────────────────────────────────────
 
-const upsertUserStatsActual = (
-  db: Database,
-  stats: UpsertUserStatsInput,
-): Result<void, Error> =>
+const upsertUserStatsActual = (db: Database, stats: UpsertUserStatsInput): Result<void, Error> =>
   toResult(() => {
     db.prepare(`
       INSERT INTO user_stats (channel_id, user_id, username, last_music_post_at, run_count, highest_run_seen, updated_at)
@@ -120,36 +117,44 @@ const upsertUserStatsActual = (
         run_count = excluded.run_count,
         highest_run_seen = excluded.highest_run_seen,
         updated_at = CURRENT_TIMESTAMP
-    `).run(stats.channelId, stats.userId, stats.username, stats.lastMusicPostAt, stats.runCount, stats.highestRunSeen)
+    `).run(
+      stats.channelId,
+      stats.userId,
+      stats.username,
+      stats.lastMusicPostAt,
+      stats.runCount,
+      stats.highestRunSeen,
+    )
   })
 
-export const upsertUserStats = (
-  db: Database,
-  stats: UpsertUserStatsInput,
-): Result<void, Error> =>
+export const upsertUserStats = (db: Database, stats: UpsertUserStatsInput): Result<void, Error> =>
   withRetry('upsertUserStats', () => upsertUserStatsActual(db, stats))
 
 // ─── 2.3 getLeaderboard ──────────────────────────────────────────────────────
 
-const getLeaderboardActual = (
-  db: Database,
-  channelId: string,
-): Result<LeaderboardRow[], Error> =>
+const getLeaderboardActual = (db: Database, channelId: string): Result<LeaderboardRow[], Error> =>
   toResult(() => {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(`
       SELECT username, run_count, highest_run_seen
       FROM user_stats
       WHERE channel_id = ? AND NOT (run_count = 0 AND highest_run_seen = 0)
       ORDER BY run_count DESC, highest_run_seen DESC
       LIMIT ?
-    `).all(channelId, LEADERBOARD_MAX_ROWS) as Array<{ username: string; run_count: number; highest_run_seen: number }>
-    return rows.map((r) => ({ username: r.username, runCount: r.run_count, highestRunSeen: r.highest_run_seen }))
+    `)
+      .all(channelId, LEADERBOARD_MAX_ROWS) as Array<{
+      username: string
+      run_count: number
+      highest_run_seen: number
+    }>
+    return rows.map((r) => ({
+      username: r.username,
+      runCount: r.run_count,
+      highestRunSeen: r.highest_run_seen,
+    }))
   })
 
-export const getLeaderboard = (
-  db: Database,
-  channelId: string,
-): Result<LeaderboardRow[], Error> =>
+export const getLeaderboard = (db: Database, channelId: string): Result<LeaderboardRow[], Error> =>
   withRetry('getLeaderboard', () => getLeaderboardActual(db, channelId))
 
 // ─── 2.4 leaderboard_channels ────────────────────────────────────────────────
@@ -215,9 +220,9 @@ const getLeaderboardPostActual = (
   channelId: string,
 ): Result<LeaderboardPost | null, Error> =>
   toResult(() => {
-    const row = db
-      .prepare('SELECT * FROM leaderboard_posts WHERE channel_id = ?')
-      .get(channelId) as LeaderboardPostRow | undefined
+    const row = db.prepare('SELECT * FROM leaderboard_posts WHERE channel_id = ?').get(channelId) as
+      | LeaderboardPostRow
+      | undefined
     return row ? mapLeaderboardPost(row) : null
   })
 
@@ -227,10 +232,7 @@ export const getLeaderboardPost = (
 ): Result<LeaderboardPost | null, Error> =>
   withRetry('getLeaderboardPost', () => getLeaderboardPostActual(db, channelId))
 
-const upsertLeaderboardPostActual = (
-  db: Database,
-  post: LeaderboardPost,
-): Result<void, Error> =>
+const upsertLeaderboardPostActual = (db: Database, post: LeaderboardPost): Result<void, Error> =>
   toResult(() => {
     db.prepare(`
       INSERT INTO leaderboard_posts (channel_id, message_id, content_hash)
@@ -242,10 +244,7 @@ const upsertLeaderboardPostActual = (
     `).run(post.channelId, post.messageId, post.contentHash)
   })
 
-export const upsertLeaderboardPost = (
-  db: Database,
-  post: LeaderboardPost,
-): Result<void, Error> =>
+export const upsertLeaderboardPost = (db: Database, post: LeaderboardPost): Result<void, Error> =>
   withRetry('upsertLeaderboardPost', () => upsertLeaderboardPostActual(db, post))
 
 const deleteLeaderboardPostActual = (db: Database, channelId: string): Result<void, Error> =>
@@ -263,9 +262,9 @@ const getRecoveryStateActual = (
   channelId: string,
 ): Result<RecoveryState | null, Error> =>
   toResult(() => {
-    const row = db
-      .prepare('SELECT * FROM recovery_state WHERE channel_id = ?')
-      .get(channelId) as RecoveryStateRow | undefined
+    const row = db.prepare('SELECT * FROM recovery_state WHERE channel_id = ?').get(channelId) as
+      | RecoveryStateRow
+      | undefined
     return row ? mapRecoveryState(row) : null
   })
 
@@ -275,10 +274,7 @@ export const getRecoveryState = (
 ): Result<RecoveryState | null, Error> =>
   withRetry('getRecoveryState', () => getRecoveryStateActual(db, channelId))
 
-const upsertRecoveryStateActual = (
-  db: Database,
-  state: RecoveryState,
-): Result<void, Error> =>
+const upsertRecoveryStateActual = (db: Database, state: RecoveryState): Result<void, Error> =>
   toResult(() => {
     db.prepare(`
       INSERT INTO recovery_state (channel_id, last_processed_message_id, updated_at)
@@ -289,10 +285,7 @@ const upsertRecoveryStateActual = (
     `).run(state.channelId, state.lastProcessedMessageId)
   })
 
-export const upsertRecoveryState = (
-  db: Database,
-  state: RecoveryState,
-): Result<void, Error> =>
+export const upsertRecoveryState = (db: Database, state: RecoveryState): Result<void, Error> =>
   withRetry('upsertRecoveryState', () => upsertRecoveryStateActual(db, state))
 
 // ─── 2.7 monitored_channels ──────────────────────────────────────────────────
@@ -306,10 +299,7 @@ const getMonitoredChannelsActual = (db: Database): Result<MonitoredChannel[], Er
 export const getMonitoredChannels = (db: Database): Result<MonitoredChannel[], Error> =>
   withRetry('getMonitoredChannels', () => getMonitoredChannelsActual(db))
 
-const addMonitoredChannelActual = (
-  db: Database,
-  channel: MonitoredChannel,
-): Result<void, Error> =>
+const addMonitoredChannelActual = (db: Database, channel: MonitoredChannel): Result<void, Error> =>
   toResult(() => {
     db.prepare(`
       INSERT INTO monitored_channels (channel_id, guild_id, leaderboard_channel_id)
@@ -318,10 +308,7 @@ const addMonitoredChannelActual = (
     `).run(channel.channelId, channel.guildId, channel.leaderboardChannelId)
   })
 
-export const addMonitoredChannel = (
-  db: Database,
-  channel: MonitoredChannel,
-): Result<void, Error> =>
+export const addMonitoredChannel = (db: Database, channel: MonitoredChannel): Result<void, Error> =>
   withRetry('addMonitoredChannel', () => addMonitoredChannelActual(db, channel))
 
 const deleteMonitoredChannelActual = (db: Database, channelId: string): Result<void, Error> =>
@@ -332,21 +319,13 @@ const deleteMonitoredChannelActual = (db: Database, channelId: string): Result<v
 export const deleteMonitoredChannel = (db: Database, channelId: string): Result<void, Error> =>
   withRetry('deleteMonitoredChannel', () => deleteMonitoredChannelActual(db, channelId))
 
-const isMonitoredChannelActual = (
-  db: Database,
-  channelId: string,
-): Result<boolean, Error> =>
+const isMonitoredChannelActual = (db: Database, channelId: string): Result<boolean, Error> =>
   toResult(() => {
-    const row = db
-      .prepare('SELECT 1 FROM monitored_channels WHERE channel_id = ?')
-      .get(channelId)
+    const row = db.prepare('SELECT 1 FROM monitored_channels WHERE channel_id = ?').get(channelId)
     return row !== undefined
   })
 
-export const isMonitoredChannel = (
-  db: Database,
-  channelId: string,
-): Result<boolean, Error> =>
+export const isMonitoredChannel = (db: Database, channelId: string): Result<boolean, Error> =>
   withRetry('isMonitoredChannel', () => isMonitoredChannelActual(db, channelId))
 
 const getMonitoredChannelByLeaderboardActual = (
@@ -370,10 +349,7 @@ export const getMonitoredChannelByLeaderboard = (
 
 // ─── 2.8 processed_messages ──────────────────────────────────────────────────
 
-const claimProcessedMessageActual = (
-  db: Database,
-  msg: ProcessedMessage,
-): Result<boolean, Error> =>
+const claimProcessedMessageActual = (db: Database, msg: ProcessedMessage): Result<boolean, Error> =>
   toResult(() => {
     const info = db
       .prepare(`
@@ -391,27 +367,16 @@ export const claimProcessedMessage = (
 ): Result<boolean, Error> =>
   withRetry('claimProcessedMessage', () => claimProcessedMessageActual(db, msg))
 
-const hasProcessedMessageActual = (
-  db: Database,
-  messageId: string,
-): Result<boolean, Error> =>
+const hasProcessedMessageActual = (db: Database, messageId: string): Result<boolean, Error> =>
   toResult(() => {
-    const row = db
-      .prepare('SELECT 1 FROM processed_messages WHERE message_id = ?')
-      .get(messageId)
+    const row = db.prepare('SELECT 1 FROM processed_messages WHERE message_id = ?').get(messageId)
     return row !== undefined
   })
 
-export const hasProcessedMessage = (
-  db: Database,
-  messageId: string,
-): Result<boolean, Error> =>
+export const hasProcessedMessage = (db: Database, messageId: string): Result<boolean, Error> =>
   withRetry('hasProcessedMessage', () => hasProcessedMessageActual(db, messageId))
 
-const pruneProcessedMessagesActual = (
-  db: Database,
-  thresholdDays: number,
-): Result<void, Error> =>
+const pruneProcessedMessagesActual = (db: Database, thresholdDays: number): Result<void, Error> =>
   toResult(() => {
     db.prepare(`
       DELETE FROM processed_messages
@@ -419,8 +384,5 @@ const pruneProcessedMessagesActual = (
     `).run(`-${thresholdDays}`)
   })
 
-export const pruneProcessedMessages = (
-  db: Database,
-  thresholdDays: number,
-): Result<void, Error> =>
+export const pruneProcessedMessages = (db: Database, thresholdDays: number): Result<void, Error> =>
   withRetry('pruneProcessedMessages', () => pruneProcessedMessagesActual(db, thresholdDays))

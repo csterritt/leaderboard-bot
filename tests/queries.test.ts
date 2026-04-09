@@ -294,22 +294,38 @@ describe('getLeaderboardPost / upsertLeaderboardPost / deleteLeaderboardPost', (
 
   it('upsertLeaderboardPost overwrites the stored message for the same channel_id', () => {
     const db = makeDb()
-    upsertLeaderboardPost(db, { channelId: LEADERBOARD_CHANNEL, messageId: 'msg-1', contentHash: 'hash1' })
-    upsertLeaderboardPost(db, { channelId: LEADERBOARD_CHANNEL, messageId: 'msg-2', contentHash: 'hash2' })
+    upsertLeaderboardPost(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      messageId: 'msg-1',
+      contentHash: 'hash1',
+    })
+    upsertLeaderboardPost(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      messageId: 'msg-2',
+      contentHash: 'hash2',
+    })
     const result = getLeaderboardPost(db, LEADERBOARD_CHANNEL)
     expect(result.value?.messageId).toBe('msg-2')
   })
 
   it('upsertLeaderboardPost persists the content hash', () => {
     const db = makeDb()
-    upsertLeaderboardPost(db, { channelId: LEADERBOARD_CHANNEL, messageId: 'msg-1', contentHash: 'abc123' })
+    upsertLeaderboardPost(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      messageId: 'msg-1',
+      contentHash: 'abc123',
+    })
     const result = getLeaderboardPost(db, LEADERBOARD_CHANNEL)
     expect(result.value?.contentHash).toBe('abc123')
   })
 
   it('deleteLeaderboardPost removes the row', () => {
     const db = makeDb()
-    upsertLeaderboardPost(db, { channelId: LEADERBOARD_CHANNEL, messageId: 'msg-1', contentHash: 'h1' })
+    upsertLeaderboardPost(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      messageId: 'msg-1',
+      contentHash: 'h1',
+    })
     deleteLeaderboardPost(db, LEADERBOARD_CHANNEL)
     const result = getLeaderboardPost(db, LEADERBOARD_CHANNEL)
     expect(result.value).toBeNull()
@@ -334,18 +350,21 @@ describe('getRecoveryState / upsertRecoveryState', () => {
   it('updated_at is set on insert and refreshed on update', () => {
     const db = makeDb()
     upsertRecoveryState(db, { channelId: CHANNEL_A, lastProcessedMessageId: 'msg-1' })
-    const row1 = db.prepare('SELECT updated_at FROM recovery_state WHERE channel_id = ?').get(CHANNEL_A) as { updated_at: string }
+    const row1 = db
+      .prepare('SELECT updated_at FROM recovery_state WHERE channel_id = ?')
+      .get(CHANNEL_A) as { updated_at: string }
     expect(row1.updated_at).toBeTruthy()
 
     upsertRecoveryState(db, { channelId: CHANNEL_A, lastProcessedMessageId: 'msg-2' })
-    const row2 = db.prepare('SELECT updated_at FROM recovery_state WHERE channel_id = ?').get(CHANNEL_A) as { updated_at: string }
+    const row2 = db
+      .prepare('SELECT updated_at FROM recovery_state WHERE channel_id = ?')
+      .get(CHANNEL_A) as { updated_at: string }
     expect(row2.updated_at).toBeTruthy()
   })
 })
 
 describe('getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / isMonitoredChannel / getMonitoredChannelByLeaderboard', () => {
-  beforeEach(() => {
-  })
+  beforeEach(() => {})
 
   it('monitored channels are empty initially', () => {
     const db = makeDb()
@@ -356,8 +375,17 @@ describe('getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / 
 
   it('adding a monitored channel with a leaderboardChannelId inserts a row', () => {
     const db = makeDb()
-    upsertLeaderboardChannel(db, { channelId: LEADERBOARD_CHANNEL, guildId: GUILD_ID, channelName: 'lb', addedByUserId: USER_A })
-    const r = addMonitoredChannel(db, { channelId: CHANNEL_A, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
+    upsertLeaderboardChannel(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      guildId: GUILD_ID,
+      channelName: 'lb',
+      addedByUserId: USER_A,
+    })
+    const r = addMonitoredChannel(db, {
+      channelId: CHANNEL_A,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
     expect(r.isOk).toBe(true)
     const all = getMonitoredChannels(db)
     expect(all.value!.length).toBe(1)
@@ -366,9 +394,22 @@ describe('getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / 
 
   it('adding the same channel again is idempotent', () => {
     const db = makeDb()
-    upsertLeaderboardChannel(db, { channelId: LEADERBOARD_CHANNEL, guildId: GUILD_ID, channelName: 'lb', addedByUserId: USER_A })
-    addMonitoredChannel(db, { channelId: CHANNEL_A, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
-    const r2 = addMonitoredChannel(db, { channelId: CHANNEL_A, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
+    upsertLeaderboardChannel(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      guildId: GUILD_ID,
+      channelName: 'lb',
+      addedByUserId: USER_A,
+    })
+    addMonitoredChannel(db, {
+      channelId: CHANNEL_A,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
+    const r2 = addMonitoredChannel(db, {
+      channelId: CHANNEL_A,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
     expect(r2.isOk).toBe(true)
     const all = getMonitoredChannels(db)
     expect(all.value!.length).toBe(1)
@@ -376,16 +417,38 @@ describe('getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / 
 
   it('adding a different monitored channel to a leaderboard channel that already has one is rejected', () => {
     const db = makeDb()
-    upsertLeaderboardChannel(db, { channelId: LEADERBOARD_CHANNEL, guildId: GUILD_ID, channelName: 'lb', addedByUserId: USER_A })
-    addMonitoredChannel(db, { channelId: CHANNEL_A, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
-    const r2 = addMonitoredChannel(db, { channelId: CHANNEL_B, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
+    upsertLeaderboardChannel(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      guildId: GUILD_ID,
+      channelName: 'lb',
+      addedByUserId: USER_A,
+    })
+    addMonitoredChannel(db, {
+      channelId: CHANNEL_A,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
+    const r2 = addMonitoredChannel(db, {
+      channelId: CHANNEL_B,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
     expect(r2.isErr).toBe(true)
   })
 
   it('deleting the channel removes it', () => {
     const db = makeDb()
-    upsertLeaderboardChannel(db, { channelId: LEADERBOARD_CHANNEL, guildId: GUILD_ID, channelName: 'lb', addedByUserId: USER_A })
-    addMonitoredChannel(db, { channelId: CHANNEL_A, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
+    upsertLeaderboardChannel(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      guildId: GUILD_ID,
+      channelName: 'lb',
+      addedByUserId: USER_A,
+    })
+    addMonitoredChannel(db, {
+      channelId: CHANNEL_A,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
     deleteMonitoredChannel(db, CHANNEL_A)
     const all = getMonitoredChannels(db)
     expect(all.value).toEqual([])
@@ -393,8 +456,17 @@ describe('getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / 
 
   it('isMonitoredChannel returns true for a monitored channel', () => {
     const db = makeDb()
-    upsertLeaderboardChannel(db, { channelId: LEADERBOARD_CHANNEL, guildId: GUILD_ID, channelName: 'lb', addedByUserId: USER_A })
-    addMonitoredChannel(db, { channelId: CHANNEL_A, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
+    upsertLeaderboardChannel(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      guildId: GUILD_ID,
+      channelName: 'lb',
+      addedByUserId: USER_A,
+    })
+    addMonitoredChannel(db, {
+      channelId: CHANNEL_A,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
     const result = isMonitoredChannel(db, CHANNEL_A)
     expect(result.isOk).toBe(true)
     expect(result.value).toBe(true)
@@ -409,7 +481,12 @@ describe('getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / 
 
   it('getMonitoredChannelByLeaderboard returns null when a leaderboard channel has no linked monitored channel', () => {
     const db = makeDb()
-    upsertLeaderboardChannel(db, { channelId: LEADERBOARD_CHANNEL, guildId: GUILD_ID, channelName: 'lb', addedByUserId: USER_A })
+    upsertLeaderboardChannel(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      guildId: GUILD_ID,
+      channelName: 'lb',
+      addedByUserId: USER_A,
+    })
     const result = getMonitoredChannelByLeaderboard(db, LEADERBOARD_CHANNEL)
     expect(result.isOk).toBe(true)
     expect(result.value).toBeNull()
@@ -417,8 +494,17 @@ describe('getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / 
 
   it('getMonitoredChannelByLeaderboard returns the linked monitored channel', () => {
     const db = makeDb()
-    upsertLeaderboardChannel(db, { channelId: LEADERBOARD_CHANNEL, guildId: GUILD_ID, channelName: 'lb', addedByUserId: USER_A })
-    addMonitoredChannel(db, { channelId: CHANNEL_A, guildId: GUILD_ID, leaderboardChannelId: LEADERBOARD_CHANNEL })
+    upsertLeaderboardChannel(db, {
+      channelId: LEADERBOARD_CHANNEL,
+      guildId: GUILD_ID,
+      channelName: 'lb',
+      addedByUserId: USER_A,
+    })
+    addMonitoredChannel(db, {
+      channelId: CHANNEL_A,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LEADERBOARD_CHANNEL,
+    })
     const result = getMonitoredChannelByLeaderboard(db, LEADERBOARD_CHANNEL)
     expect(result.isOk).toBe(true)
     expect(result.value?.channelId).toBe(CHANNEL_A)
