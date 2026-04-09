@@ -169,6 +169,7 @@ bun run src/index.ts
 - Old idempotency records are pruned periodically to keep table growth bounded
 - The bot uses content hashing to avoid reposting unchanged leaderboard messages
 - Previous leaderboard messages are deleted before posting updated leaderboard content when needed
+- Note for the future: whenever you re-run bun install, you'll need to re-run `npx node-gyp rebuild` in the `better-sqlite3` directory again, since bun will overwrite the directory. The note I got this from says, "Alternatively, add a postinstall script to `package.json` or switch to `npm install` for this project." which I did, but doesn't seem to do the whole thing.
 
 ## Status
 
