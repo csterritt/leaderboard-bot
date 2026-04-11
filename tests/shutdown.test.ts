@@ -77,15 +77,12 @@ describe('createShutdown', () => {
     expect(resources.db.close).toHaveBeenCalledTimes(1)
   })
 
-  it('logs shutdown messages', () => {
+  it('logs shutdown messages with [shutdown] prefix', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const resources = makeResources()
     const shutdown = createShutdown(resources)
     shutdown()
-    expect(
-      logSpy.mock.calls.some(
-        ([msg]) => typeof msg === 'string' && msg.toLowerCase().includes('shut'),
-      ),
-    ).toBe(true)
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[shutdown]'))
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[shutdown] complete'))
   })
 })

@@ -332,3 +332,115 @@ describe('fetchChannel', () => {
     expect(result.isOk).toBe(false)
   })
 })
+
+// ─── Discord logging ──────────────────────────────────────────────────────────
+
+describe('discord service logging', () => {
+  beforeEach(() => {
+    _resetRateLimit()
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('logs when a message is sent successfully', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => jsonResponse(200, { id: 'msg-new' })])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = sendMessage(TOKEN, CHANNEL_ID, 'hello')
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] message sent'))
+  })
+
+  it('logs error when sendMessage fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => emptyResponse(403)])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = sendMessage(TOKEN, CHANNEL_ID, 'hello')
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] sendMessage failed'))
+  })
+
+  it('logs when a message is deleted successfully', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => emptyResponse(204)])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] message deleted'))
+  })
+
+  it('logs error when deleteMessage fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => emptyResponse(403)])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] deleteMessage failed'))
+  })
+
+  it('logs when messages are fetched successfully', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => jsonResponse(200, [])])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, '0')
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] fetched messages'))
+  })
+
+  it('logs error when fetchMessagesAfter fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => emptyResponse(500)])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, '0')
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] fetchMessagesAfter failed'),
+    )
+  })
+
+  it('logs when a channel is fetched successfully', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => jsonResponse(200, { id: CHANNEL_ID, name: 'music' })])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = fetchChannel(TOKEN, CHANNEL_ID)
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] channel fetched'))
+  })
+
+  it('logs error when fetchChannel fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const mockFetch = makeFetchMock([() => emptyResponse(404)])
+    vi.stubGlobal('fetch', mockFetch)
+
+    const p = fetchChannel(TOKEN, CHANNEL_ID)
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] fetchChannel failed'))
+  })
+})

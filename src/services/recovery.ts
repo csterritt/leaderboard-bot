@@ -27,6 +27,7 @@ export const recoverChannel = async (
   token: string,
   channelId: string,
 ): Promise<Result<number, Error>> => {
+  console.log(`[recovery] starting recovery for channel: ${channelId}`)
   const stateResult = getRecoveryState(db, channelId)
   if (!stateResult.isOk) return Result.err(stateResult.error)
 
@@ -58,6 +59,7 @@ export const recoverChannel = async (
     }
   }
 
+  console.log(`[recovery] channel ${channelId}: processed ${totalProcessed} message(s)`)
   return Result.ok(totalProcessed)
 }
 
@@ -70,10 +72,12 @@ export const recoverAllChannels = async (
   const channelsResult = getMonitoredChannels(db)
   if (!channelsResult.isOk) return Result.err(channelsResult.error)
 
+  console.log(`[recovery] recovering ${channelsResult.value.length} channel(s)`)
   for (const channel of channelsResult.value) {
     const result = await recoverChannel(db, token, channel.channelId)
     if (!result.isOk) return Result.err(result.error)
   }
 
+  console.log('[recovery] all channels recovery complete')
   return Result.ok(undefined)
 }

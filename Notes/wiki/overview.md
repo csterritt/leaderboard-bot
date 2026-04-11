@@ -29,6 +29,7 @@ A Discord bot that:
 - **Single transaction**: `processMessage` performs claim + stats mutation atomically.
 - **Recovery owns checkpoint**: `processMessage` never advances `recovery_state`; only recovery orchestration does.
 - **Channel scoping**: stats are never merged across channels.
+- **Structured logging**: all log messages use a `[component]` prefix (e.g. `[gateway]`, `[processor]`, `[scheduled]`, `[recovery]`, `[discord]`, `[startup]`, `[shutdown]`, `[interactions]`). Normal flow uses `console.log`, warnings use `console.warn`, errors use `console.error`.
 
 ## Source Structure
 

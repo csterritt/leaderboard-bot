@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -288,5 +288,68 @@ describe('processMessage', () => {
     const result = processMessage(db, msg)
     expect(result.isOk).toBe(true)
     expect(result.value).toBe(true)
+  })
+})
+
+// ─── processMessage logging ───────────────────────────────────────────────────
+
+describe('processMessage logging', () => {
+  let db: DatabaseType
+
+  beforeEach(() => {
+    db = makeDb()
+    seedChannels(db)
+  })
+
+  it('logs when skipping bot message', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const msg = makeMsg({ author: { id: 'bot-1', username: 'bot', globalName: null, isBot: true } })
+    processMessage(db, msg)
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[processor] skipping bot message'))
+  })
+
+  it('logs when skipping non-default message type', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const msg = makeMsg({ type: 20 })
+    processMessage(db, msg)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[processor] skipping non-default message type'),
+    )
+  })
+
+  it('logs when skipping message without music attachment', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const msg = makeMsg({ attachments: [{ filename: 'photo.png' }] })
+    processMessage(db, msg)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[processor] skipping message without music attachment'),
+    )
+  })
+
+  it('logs when skipping message in non-monitored channel', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const msg = makeMsg({ channelId: 'not-monitored' })
+    processMessage(db, msg)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[processor] skipping message in non-monitored channel'),
+    )
+  })
+
+  it('logs when stats are updated', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const msg = makeMsg()
+    processMessage(db, msg)
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[processor] stats updated'))
+  })
+
+  it('logs error when processing fails', () => {
+    db.exec('DROP TABLE user_stats')
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const msg = makeMsg()
+    processMessage(db, msg)
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[processor] error processing message'),
+      expect.any(Error),
+    )
   })
 })

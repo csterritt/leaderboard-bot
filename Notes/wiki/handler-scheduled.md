@@ -26,6 +26,20 @@ Orchestrates the scheduled work pipeline in order:
    - Upserts `leaderboard_posts(channel_id, message_id, content_hash)`.
 4. **Pruning** — calls `pruneProcessedMessages(db, PRUNE_THRESHOLD_DAYS)` (14 days) after all posting is done.
 
+**Logging:**
+
+- `[scheduled] starting scheduled work` — on entry.
+- `[scheduled] no leaderboard channels configured, skipping` — when no channels.
+- `[scheduled] found N leaderboard channel(s)` — channel count.
+- `[scheduled] processing leaderboard channel: <id> (<name>)` — per channel.
+- `[scheduled] removing orphaned leaderboard post for channel: <id>` — when no linked monitored channel.
+- `[scheduled] channel <id> has no linked monitored channel, skipping` — when no linked channel and no existing post.
+- `[scheduled] leaderboard unchanged for channel: <id>` — content hash match.
+- `[scheduled] deleting stale leaderboard message for channel: <id>` — before posting new.
+- `[scheduled] leaderboard post updated for channel: <id>` — after successful post.
+- `[scheduled] pruned processed messages` — after pruning.
+- `[scheduled] scheduled work complete` — on exit.
+
 ## Key Design Rules
 
 - Recovery always runs **before** any leaderboard posting.

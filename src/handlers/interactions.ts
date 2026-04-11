@@ -210,28 +210,40 @@ async function routeInteraction(
   token: string,
 ): Promise<Response> {
   if (interaction.type === 1) {
+    console.log('[interactions] ping received')
     return Response.json({ type: 1 }, { status: 200 })
   }
 
   if (interaction.type === 2) {
     const commandName = interaction.data?.name
+    console.log(`[interactions] command received: ${commandName} id=${interaction.id}`)
 
+    let response: Response
     switch (commandName) {
       case 'leaderboard':
-        return handleLeaderboard(interaction, db, token)
+        response = await handleLeaderboard(interaction, db, token)
+        break
       case 'setleaderboardchannel':
-        return handleSetLeaderboardChannel(interaction, db)
+        response = handleSetLeaderboardChannel(interaction, db)
+        break
       case 'removeleaderboardchannel':
-        return handleRemoveLeaderboardChannel(interaction, db)
+        response = handleRemoveLeaderboardChannel(interaction, db)
+        break
       case 'addmonitoredchannel':
-        return handleAddMonitoredChannel(interaction, db)
+        response = handleAddMonitoredChannel(interaction, db)
+        break
       case 'removemonitoredchannel':
-        return handleRemoveMonitoredChannel(interaction, db)
+        response = handleRemoveMonitoredChannel(interaction, db)
+        break
       default:
+        console.warn(`[interactions] unknown command: ${commandName}`)
         return new Response('Unknown command', { status: 400 })
     }
+    console.log(`[interactions] command completed: ${commandName} status=${response.status}`)
+    return response
   }
 
+  console.warn(`[interactions] unknown interaction type: ${interaction.type}`)
   return new Response('Unknown interaction type', { status: 400 })
 }
 
@@ -247,6 +259,7 @@ export const handleInteractionWithVerifier = async (
   const timestamp = request.headers.get('x-signature-timestamp')
 
   if (!signature || !timestamp) {
+    console.warn('[interactions] missing signature headers')
     return new Response('Missing signature headers', { status: 401 })
   }
 
@@ -254,8 +267,10 @@ export const handleInteractionWithVerifier = async (
 
   const valid = await verifier({ timestamp, body, signature })
   if (!valid) {
+    console.warn('[interactions] invalid signature')
     return new Response('Invalid signature', { status: 401 })
   }
+  console.log('[interactions] signature verified')
 
   const interaction = JSON.parse(body) as DiscordInteraction
   return routeInteraction(interaction, db, token)

@@ -57,11 +57,15 @@ describe('runScheduledWork', () => {
 
   it('does nothing when there are no configured leaderboard channels', async () => {
     const mockFetch = vi.fn()
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.stubGlobal('fetch', mockFetch)
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
     expect(mockFetch).not.toHaveBeenCalled()
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[scheduled] no leaderboard channels configured'),
+    )
   })
 
   it('runs recovery before leaderboard posting', async () => {
@@ -395,5 +399,100 @@ describe('runScheduledWork', () => {
 
     expect(oldExists).toBeUndefined()
     expect(recentExists).toBeDefined()
+  })
+
+  it('logs start and completion of scheduled work', async () => {
+    seedLeaderboardChannel(db)
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts?: RequestInit) => {
+        if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+        if (opts?.method === 'POST')
+          return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
+        return new Response('{}', { status: 200 })
+      }),
+    )
+
+    const result = await runScheduledWork(db, TOKEN)
+    expect(result.isOk).toBe(true)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[scheduled] starting scheduled work'),
+    )
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[scheduled] scheduled work complete'),
+    )
+  })
+
+  it('logs when leaderboard content is unchanged', async () => {
+    seedLeaderboardChannel(db)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts?: RequestInit) => {
+        if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+        if (opts?.method === 'POST')
+          return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
+        return new Response('{}', { status: 200 })
+      }),
+    )
+
+    await runScheduledWork(db, TOKEN)
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await runScheduledWork(db, TOKEN)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[scheduled] leaderboard unchanged'),
+    )
+  })
+
+  it('logs when leaderboard post is updated', async () => {
+    seedLeaderboardChannel(db)
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'user-1',
+      username: 'alice',
+      lastMusicPostAt: Date.now(),
+      runCount: 1,
+      highestRunSeen: 1,
+    })
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts?: RequestInit) => {
+        if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+        if (opts?.method === 'POST')
+          return new Response(JSON.stringify({ id: 'msg-posted' }), { status: 200 })
+        return new Response('{}', { status: 200 })
+      }),
+    )
+
+    const result = await runScheduledWork(db, TOKEN)
+    expect(result.isOk).toBe(true)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[scheduled] leaderboard post updated'),
+    )
+  })
+
+  it('logs pruned processed messages', async () => {
+    seedLeaderboardChannel(db)
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts?: RequestInit) => {
+        if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+        if (opts?.method === 'POST')
+          return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
+        return new Response('{}', { status: 200 })
+      }),
+    )
+
+    const result = await runScheduledWork(db, TOKEN)
+    expect(result.isOk).toBe(true)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[scheduled] pruned processed messages'),
+    )
   })
 })

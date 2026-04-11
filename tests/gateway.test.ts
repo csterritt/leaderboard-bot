@@ -123,4 +123,44 @@ describe('setupGatewayHandler', () => {
 
     expect(consoleSpy).toHaveBeenCalled()
   })
+
+  it('logs when a message is received', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    setupGatewayHandler(client as never, db)
+
+    client.emit('messageCreate', makeGatewayMessage())
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[gateway] message received'))
+  })
+
+  it('logs when a message is processed successfully', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    setupGatewayHandler(client as never, db)
+
+    client.emit('messageCreate', makeGatewayMessage())
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[gateway] message processed'))
+  })
+
+  it('logs when a message is skipped (bot message)', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    setupGatewayHandler(client as never, db)
+
+    const botMsg = makeGatewayMessage({
+      author: { id: 'bot-1', username: 'mybot', globalName: null, bot: true },
+    })
+    client.emit('messageCreate', botMsg)
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[gateway] message skipped'))
+  })
+
+  it('logs error with message id when processMessage fails', () => {
+    db.exec('DROP TABLE user_stats')
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    setupGatewayHandler(client as never, db)
+    client.emit('messageCreate', makeGatewayMessage())
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[gateway]'), expect.any(Error))
+  })
 })

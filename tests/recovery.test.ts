@@ -341,4 +341,78 @@ describe('recoverAllChannels', () => {
     const result = await recoverAllChannels(db, TOKEN)
     expect(result.isOk).toBe(true)
   })
+
+  it('logs recovery start and completion for all channels', async () => {
+    upsertLeaderboardChannel(db, {
+      channelId: 'lc-1',
+      guildId: GUILD_ID,
+      channelName: '#lb1',
+      addedByUserId: 'admin',
+    })
+    addMonitoredChannel(db, { channelId: 'mc-1', guildId: GUILD_ID, leaderboardChannelId: 'lc-1' })
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })),
+    )
+
+    const result = await recoverAllChannels(db, TOKEN)
+    expect(result.isOk).toBe(true)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[recovery] recovering 1 channel(s)'),
+    )
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[recovery] all channels recovery complete'),
+    )
+  })
+})
+
+// ─── recoverChannel logging ───────────────────────────────────────────────────
+
+describe('recoverChannel logging', () => {
+  let db: DatabaseType
+
+  beforeEach(() => {
+    db = makeDb()
+    seedChannels(db)
+    vi.resetAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('logs channel recovery start', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })),
+    )
+
+    await recoverChannel(db, TOKEN, MC_ID)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[recovery] starting recovery for channel'),
+    )
+  })
+
+  it('logs processed message count on completion', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const msg = makeDiscordMessage({ id: 'msg-001' })
+
+    let callCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        callCount++
+        if (callCount === 1) return new Response(JSON.stringify([msg]), { status: 200 })
+        return new Response(JSON.stringify([]), { status: 200 })
+      }),
+    )
+
+    await recoverChannel(db, TOKEN, MC_ID)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[recovery] channel mc-001: processed 1 message(s)'),
+    )
+  })
 })

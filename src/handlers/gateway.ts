@@ -7,9 +7,16 @@ import type { Database } from '../types'
 export const setupGatewayHandler = (client: Client, db: Database): void => {
   client.on('messageCreate', (message) => {
     const normalized = normalizeGatewayMessage(message as never)
+    console.log(
+      `[gateway] message received: id=${normalized.id} channelId=${normalized.channelId} authorId=${normalized.author.id}`,
+    )
     const result = processMessage(db, normalized)
     if (!result.isOk) {
-      console.error('processMessage error in gateway handler', result.error)
+      console.error(`[gateway] processMessage error: id=${normalized.id}`, result.error)
+    } else if (result.value) {
+      console.log(`[gateway] message processed: id=${normalized.id}`)
+    } else {
+      console.log(`[gateway] message skipped: id=${normalized.id}`)
     }
   })
 }

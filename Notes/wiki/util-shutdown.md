@@ -27,7 +27,7 @@ const createShutdown = (resources: ShutdownResources): (() => void)
    - Destroys the discord.js client (closes the gateway connection)
    - Closes the better-sqlite3 database
 2. Subsequent calls are no-ops (idempotent).
-3. Logs `"Shutting down gracefully..."` and `"Shutdown complete"`.
+3. Logs `[shutdown] shutting down gracefully...`, per-resource cleanup messages, and `[shutdown] complete`.
 
 ## Wiring (in `src/index.ts`)
 
@@ -48,7 +48,7 @@ process.on('SIGINT', shutdown)
 - Clears the interval when set
 - Does not call clearInterval when intervalId is null
 - Idempotent — calling twice only cleans up once
-- Logs shutdown messages
+- Logs shutdown messages with `[shutdown]` prefix
 
 ## Cross-references
 

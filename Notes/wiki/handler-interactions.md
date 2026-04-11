@@ -16,13 +16,20 @@ Public entry point. Verifies the request signature using `verifyDiscordSignature
 
 Testable entry point that accepts an injected verifier function. Returns `401` if headers are missing or the verifier returns false. Parses the body as `DiscordInteraction` and dispatches to `routeInteraction`.
 
+**Logging:**
+
+- `[interactions] missing signature headers` — `console.warn` on missing signature/ timestamp headers.
+- `[interactions] invalid signature` — `console.warn` on failed verification.
+- `[interactions] signature verified` — `console.log` after successful verification.
+
 ## Routing
 
-| Interaction type          | Dispatch              |
-| ------------------------- | --------------------- |
-| `type = 1`                | Ping → `{ type: 1 }`  |
-| `type = 2` + command name | Slash command handler |
-| Unknown                   | `400`                 |
+| Interaction type          | Dispatch              | Log message                                                                            |
+| ------------------------- | --------------------- | -------------------------------------------------------------------------------------- |
+| `type = 1`                | Ping → `{ type: 1 }`  | `[interactions] ping received`                                                         |
+| `type = 2` + command name | Slash command handler | `[interactions] command received: <name>` / `[interactions] command completed: <name>` |
+| Unknown command           | `400`                 | `[interactions] unknown command: <name>`                                               |
+| Unknown type              | `400`                 | `[interactions] unknown interaction type: <type>`                                      |
 
 ## Slash Command Handlers
 

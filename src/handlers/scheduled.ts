@@ -20,15 +20,21 @@ export const runScheduledWork = async (
   db: Database,
   token: string,
 ): Promise<Result<void, Error>> => {
+  console.log('[scheduled] starting scheduled work')
   const channelsResult = getLeaderboardChannels(db)
   if (!channelsResult.isOk) return Result.err(channelsResult.error)
 
-  if (channelsResult.value.length === 0) return Result.ok(undefined)
+  if (channelsResult.value.length === 0) {
+    console.log('[scheduled] no leaderboard channels configured, skipping')
+    return Result.ok(undefined)
+  }
 
+  console.log(`[scheduled] found ${channelsResult.value.length} leaderboard channel(s)`)
   const recoveryResult = await recoverAllChannels(db, token)
   if (!recoveryResult.isOk) return Result.err(recoveryResult.error)
 
   for (const lc of channelsResult.value) {
+    console.log(`[scheduled] processing leaderboard channel: ${lc.channelId} (${lc.channelName})`)
     const monitoredResult = getMonitoredChannelByLeaderboard(db, lc.channelId)
     if (!monitoredResult.isOk) return Result.err(monitoredResult.error)
 
@@ -37,6 +43,7 @@ export const runScheduledWork = async (
 
     if (!monitoredResult.value) {
       if (existingPostResult.value) {
+        console.log(`[scheduled] removing orphaned leaderboard post for channel: ${lc.channelId}`)
         const delResult = await deleteMessage(
           token,
           lc.channelId,
@@ -45,6 +52,8 @@ export const runScheduledWork = async (
         if (!delResult.isOk) return Result.err(delResult.error)
         const dbDelResult = deleteLeaderboardPost(db, lc.channelId)
         if (!dbDelResult.isOk) return Result.err(dbDelResult.error)
+      } else {
+        console.log(`[scheduled] channel ${lc.channelId} has no linked monitored channel, skipping`)
       }
       continue
     }
@@ -56,9 +65,13 @@ export const runScheduledWork = async (
     const content = formatLeaderboard(lc.channelName, rowsResult.value)
     const newHash = hashContent(content)
 
-    if (existingPostResult.value?.contentHash === newHash) continue
+    if (existingPostResult.value?.contentHash === newHash) {
+      console.log(`[scheduled] leaderboard unchanged for channel: ${lc.channelId}`)
+      continue
+    }
 
     if (existingPostResult.value) {
+      console.log(`[scheduled] deleting stale leaderboard message for channel: ${lc.channelId}`)
       const delResult = await deleteMessage(token, lc.channelId, existingPostResult.value.messageId)
       if (!delResult.isOk) return Result.err(delResult.error)
     }
@@ -72,10 +85,13 @@ export const runScheduledWork = async (
       contentHash: newHash,
     })
     if (!upsertResult.isOk) return Result.err(upsertResult.error)
+    console.log(`[scheduled] leaderboard post updated for channel: ${lc.channelId}`)
   }
 
   const pruneResult = pruneProcessedMessages(db, PRUNE_THRESHOLD_DAYS)
   if (!pruneResult.isOk) return Result.err(pruneResult.error)
+  console.log('[scheduled] pruned processed messages')
 
+  console.log('[scheduled] scheduled work complete')
   return Result.ok(undefined)
 }

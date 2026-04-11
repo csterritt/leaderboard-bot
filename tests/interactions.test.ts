@@ -770,4 +770,86 @@ describe('interaction router', () => {
     )
     expect(res.status).toBe(400)
   })
+
+  it('logs unknown command name as a warning', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await dispatch(
+      db,
+      makeInteraction({
+        data: { name: 'unknowncommand' },
+      }),
+    )
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[interactions]'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown command'))
+  })
+
+  it('logs unknown interaction type as a warning', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await dispatch(db, { type: 99, id: 'int-99', data: { name: 'foo' } })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[interactions]'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown interaction type'))
+  })
+})
+
+// ─── Logging ────────────────────────────────────────────────────────────────
+
+describe('interaction logging', () => {
+  let db: DatabaseType
+
+  beforeEach(() => {
+    db = makeDb()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('logs ping received', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await dispatch(db, { type: 1 })
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[interactions] ping received'))
+  })
+
+  it('logs command received and completed for /leaderboard', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    upsertLeaderboardChannel(db, {
+      channelId: LC_ID,
+      guildId: GUILD_ID,
+      channelName: 'leaderboard',
+      addedByUserId: ADMIN_USER_ID,
+    })
+    addMonitoredChannel(db, {
+      channelId: MC_ID,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LC_ID,
+    })
+    await dispatch(db, makeInteraction({ data: { name: 'leaderboard' } }))
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[interactions] command received: leaderboard'),
+    )
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[interactions] command completed: leaderboard'),
+    )
+  })
+
+  it('logs signature verified for valid requests', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await dispatch(db, { type: 1 })
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[interactions] signature verified'),
+    )
+  })
+
+  it('logs warning for missing signature headers', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const req = new Request('http://localhost/interactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 1 }),
+    })
+    await handleInteraction(req, db, TOKEN, PUBLIC_KEY)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[interactions] missing signature headers'),
+    )
+  })
 })

@@ -17,11 +17,21 @@ Performs backfill recovery for monitored channels by fetching messages from the 
 - If `processMessage` returns `Result.err`, immediately returns that error (checkpoint is not advanced beyond the failing message).
 - Returns `Result.ok(totalProcessed)` — count of messages that were actually processed (not skipped).
 
+**Logging:**
+
+- `[recovery] starting recovery for channel: <channelId>` — on entry.
+- `[recovery] channel <channelId>: processed <N> message(s)` — on completion.
+
 ### `recoverAllChannels(db, token): Promise<Result<void, Error>>`
 
 - Calls `getMonitoredChannels` and iterates, calling `recoverChannel` for each.
 - Returns `Result.err` on the first channel that fails.
 - Succeeds with `Result.ok(undefined)` when there are no monitored channels.
+
+**Logging:**
+
+- `[recovery] recovering N channel(s)` — on entry.
+- `[recovery] all channels recovery complete` — on completion.
 
 ## Key Design Rules
 

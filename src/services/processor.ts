@@ -90,13 +90,29 @@ export const processMessage = (
   db: Database,
   message: NormalizedMessage,
 ): Result<boolean, Error> => {
-  if (message.author.isBot) return Result.ok(false)
-  if (!(ACCEPTED_MESSAGE_TYPES as readonly number[]).includes(message.type)) return Result.ok(false)
-  if (!hasMusicAttachment(message.attachments)) return Result.ok(false)
+  if (message.author.isBot) {
+    console.log(`[processor] skipping bot message: id=${message.id}`)
+    return Result.ok(false)
+  }
+  if (!(ACCEPTED_MESSAGE_TYPES as readonly number[]).includes(message.type)) {
+    console.log(
+      `[processor] skipping non-default message type: id=${message.id} type=${message.type}`,
+    )
+    return Result.ok(false)
+  }
+  if (!hasMusicAttachment(message.attachments)) {
+    console.log(`[processor] skipping message without music attachment: id=${message.id}`)
+    return Result.ok(false)
+  }
 
   const monitoredResult = isMonitoredChannel(db, message.channelId)
   if (!monitoredResult.isOk) return Result.err(monitoredResult.error)
-  if (!monitoredResult.value) return Result.ok(false)
+  if (!monitoredResult.value) {
+    console.log(
+      `[processor] skipping message in non-monitored channel: id=${message.id} channelId=${message.channelId}`,
+    )
+    return Result.ok(false)
+  }
 
   try {
     let processed = false
@@ -108,6 +124,7 @@ export const processMessage = (
       })
       if (!claimResult.isOk) throw claimResult.error
       if (!claimResult.value) {
+        console.log(`[processor] skipping already-processed message: id=${message.id}`)
         return
       }
 
@@ -128,11 +145,18 @@ export const processMessage = (
       const upsertResult = upsertUserStats(db, newStats)
       if (!upsertResult.isOk) throw upsertResult.error
 
+      console.log(
+        `[processor] stats updated: userId=${message.author.id} channelId=${message.channelId} runCount=${newStats.runCount}`,
+      )
       processed = true
     })()
 
     return Result.ok(processed)
   } catch (error) {
+    console.error(
+      `[processor] error processing message: id=${message.id}`,
+      error instanceof Error ? error : new Error(String(error)),
+    )
     return Result.err(error instanceof Error ? error : new Error(String(error)))
   }
 }

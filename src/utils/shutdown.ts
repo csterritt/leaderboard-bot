@@ -12,16 +12,20 @@ export const createShutdown = (resources: ShutdownResources): (() => void) => {
     if (isShuttingDown) return
     isShuttingDown = true
 
-    console.log('Shutting down gracefully...')
+    console.log('[shutdown] shutting down gracefully...')
 
     if (resources.intervalId !== null) {
+      console.log('[shutdown] clearing interval')
       clearInterval(resources.intervalId)
     }
 
+    console.log('[shutdown] stopping HTTP server')
     resources.server.stop()
+    console.log('[shutdown] destroying Discord client')
     resources.client.destroy()
+    console.log('[shutdown] closing database')
     resources.db.close()
 
-    console.log('Shutdown complete')
+    console.log('[shutdown] complete')
   }
 }

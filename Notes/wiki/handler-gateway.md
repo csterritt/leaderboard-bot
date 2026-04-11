@@ -13,7 +13,10 @@ Wires the `discord.js` `Client` to the shared `processMessage` pipeline. The `di
 - Listens on `client.on('messageCreate', ...)`.
 - Normalizes the gateway `Message` object into `NormalizedMessage` via `normalizeGatewayMessage`.
 - Calls `processMessage(db, normalized)`.
-- On `Result.err`: logs to `console.error` and swallows the error (fire-and-forget). Recovery will retry later.
+- Logs `[gateway] message received: id=... channelId=... authorId=...` on every message.
+- On `Result.ok(true)`: logs `[gateway] message processed: id=...`.
+- On `Result.ok(false)`: logs `[gateway] message skipped: id=...`.
+- On `Result.err`: logs `[gateway] processMessage error: id=...` to `console.error` and swallows the error (fire-and-forget). Recovery will retry later.
 - Does **not** advance `recovery_state` — only the recovery service owns checkpoint advancement.
 
 ## Key Design Rules

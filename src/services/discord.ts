@@ -50,11 +50,13 @@ const discordFetch = async (
 
     if (response.status === 429) {
       const retryAfter = parseFloat(response.headers.get('Retry-After') ?? '1')
+      console.warn(`[discord] rate limited on ${url}, retrying after ${retryAfter}s`)
       await new Promise<void>((resolve) => setTimeout(resolve, retryAfter * 1000))
       response = await fetch(url, { ...options, headers })
       lastRequestAt = Date.now()
 
       if (response.status === 429) {
+        console.error(`[discord] rate limited twice on ${url}`)
         return Result.err(new Error(`Rate limited twice on ${url}`))
       }
     }
@@ -84,10 +86,12 @@ export const sendMessage = async (
 
   const response = fetchResult.value
   if (!response.ok) {
+    console.error(`[discord] sendMessage failed: channelId=${channelId} status=${response.status}`)
     return Result.err(new Error(`sendMessage failed: ${response.status}`))
   }
 
   const data = (await response.json()) as { id: string }
+  console.log(`[discord] message sent: channelId=${channelId} messageId=${data.id}`)
   return Result.ok(data.id)
 }
 
@@ -107,10 +111,16 @@ export const deleteMessage = async (
   const response = fetchResult.value
 
   if (response.status === 204 || response.status === 404) {
+    console.log(
+      `[discord] message deleted: channelId=${channelId} messageId=${messageId} status=${response.status}`,
+    )
     return Result.ok(true)
   }
 
   if (!response.ok) {
+    console.error(
+      `[discord] deleteMessage failed: channelId=${channelId} messageId=${messageId} status=${response.status}`,
+    )
     return Result.err(new Error(`deleteMessage failed: ${response.status}`))
   }
 
@@ -132,10 +142,14 @@ export const fetchMessagesAfter = async (
 
   const response = fetchResult.value
   if (!response.ok) {
+    console.error(
+      `[discord] fetchMessagesAfter failed: channelId=${channelId} status=${response.status}`,
+    )
     return Result.err(new Error(`fetchMessagesAfter failed: ${response.status}`))
   }
 
   const data = (await response.json()) as DiscordMessage[]
+  console.log(`[discord] fetched messages: channelId=${channelId} count=${data.length}`)
   return Result.ok(data)
 }
 
@@ -153,9 +167,11 @@ export const fetchChannel = async (
 
   const response = fetchResult.value
   if (!response.ok) {
+    console.error(`[discord] fetchChannel failed: channelId=${channelId} status=${response.status}`)
     return Result.err(new Error(`fetchChannel failed: ${response.status}`))
   }
 
   const data = (await response.json()) as { id: string; name: string }
+  console.log(`[discord] channel fetched: channelId=${channelId} name=${data.name}`)
   return Result.ok({ id: data.id, name: data.name })
 }

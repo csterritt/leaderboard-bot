@@ -46,6 +46,16 @@ Single transactional message-processing path.
 4. If any step inside the transaction throws, the whole transaction rolls back (including the claim).
 5. Does **not** advance `recovery_state`; that is recovery's responsibility.
 
+**Logging:**
+
+- `[processor] skipping bot message: id=...` — bot filter.
+- `[processor] skipping non-default message type: id=... type=...` — type filter.
+- `[processor] skipping message without music attachment: id=...` — attachment filter.
+- `[processor] skipping message in non-monitored channel: id=... channelId=...` — channel filter.
+- `[processor] skipping already-processed message: id=...` — idempotency guard.
+- `[processor] stats updated: userId=... channelId=... runCount=...` — successful processing.
+- `[processor] error processing message: id=...` — `console.error` on transaction failure.
+
 ## Related pages
 
 - [service-tracker.md](service-tracker.md) — `hasMusicAttachment`, `computeNewStats`, `resolveUsername`

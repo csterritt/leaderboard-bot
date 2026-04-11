@@ -45,6 +45,7 @@ This policy is incorporated into the [Discord Developer Terms of Service](https:
 14. **No evading enforcement** — Developers of removed Applications may not recreate the same or substantially similar Applications.
 
 **Additional requirements:**
+
 - Developers must provide users a way to report issues/violations relating to the Application, and must review and act on such reports.
 - Developers should use commercially reasonable efforts to be available for feedback/user support.
 

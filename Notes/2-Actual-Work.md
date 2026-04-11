@@ -1,3 +1,3 @@
 Act as a meticulous code designer and coder.
 
-Set up the project to collect coverage statistics when tests are run.
+Go through the main entry points for the application and add comprehensive logging to track the flow of execution and identify any potential issues.
