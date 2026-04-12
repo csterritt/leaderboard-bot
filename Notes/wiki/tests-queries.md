@@ -1,6 +1,6 @@
 # tests/queries.test.ts
 
-Tests for `src/db/queries.ts`. Each test suite creates a fresh in-memory better-sqlite3 database and applies `schema.sql` before each test via `makeDb()`.
+Tests for `src/db/queries.ts`. Each test suite creates a fresh in-memory bun:sqlite database and applies `schema.sql` before each test via `makeDb()`.
 
 ## Coverage
 

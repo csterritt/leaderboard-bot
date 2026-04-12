@@ -69,4 +69,4 @@
 
 - Uses `handleInteractionWithVerifier` with an always-true injected verifier to bypass Ed25519 verification.
 - `vi.stubGlobal('fetch', ...)` for tests requiring `fetchChannel` mock.
-- In-memory better-sqlite3 database per test.
+- In-memory bun:sqlite database per test.

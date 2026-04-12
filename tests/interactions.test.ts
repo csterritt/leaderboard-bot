@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import Database from 'better-sqlite3'
+import { Database } from 'bun:sqlite'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { handleInteraction } from '../src/handlers/interactions'
@@ -18,7 +18,7 @@ const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), '
 function makeDb(): DatabaseType {
   const db = new Database(':memory:')
   db.exec(schema)
-  db.pragma('foreign_keys = ON')
+  db.exec('PRAGMA foreign_keys = ON')
   return db
 }
 
@@ -491,7 +491,7 @@ describe('/removeleaderboardchannel', () => {
   it('deletes the stored leaderboard_posts row for the channel', async () => {
     await dispatch(db, makeInteraction({ data: { name: 'removeleaderboardchannel' } }))
     const row = db.prepare('SELECT * FROM leaderboard_posts WHERE channel_id = ?').get(LC_ID)
-    expect(row).toBeUndefined()
+    expect(row).toBeNull()
   })
 
   it('does not delete historical user_stats rows', async () => {
@@ -505,7 +505,7 @@ describe('/removeleaderboardchannel', () => {
     })
     await dispatch(db, makeInteraction({ data: { name: 'removeleaderboardchannel' } }))
     const row = db.prepare('SELECT * FROM user_stats WHERE channel_id = ?').get(MC_ID)
-    expect(row).toBeDefined()
+    expect(row).not.toBeNull()
   })
 })
 
@@ -701,7 +701,7 @@ describe('/removemonitoredchannel', () => {
       }),
     )
     const row = db.prepare('SELECT * FROM user_stats WHERE channel_id = ?').get(MC_ID)
-    expect(row).toBeDefined()
+    expect(row).not.toBeNull()
   })
 })
 

@@ -93,7 +93,7 @@ const getUserStatsActual = (
   toResult(() => {
     const row = db
       .prepare('SELECT * FROM user_stats WHERE channel_id = ? AND user_id = ?')
-      .get(channelId, userId) as UserStatsRow | undefined
+      .get(channelId, userId) as UserStatsRow | null
     return row ? mapUserStats(row) : null
   })
 
@@ -203,7 +203,7 @@ const getLeaderboardChannelActual = (
   toResult(() => {
     const row = db
       .prepare('SELECT * FROM leaderboard_channels WHERE channel_id = ?')
-      .get(channelId) as LeaderboardChannelRow | undefined
+      .get(channelId) as LeaderboardChannelRow | null
     return row ? mapLeaderboardChannel(row) : null
   })
 
@@ -222,7 +222,7 @@ const getLeaderboardPostActual = (
   toResult(() => {
     const row = db.prepare('SELECT * FROM leaderboard_posts WHERE channel_id = ?').get(channelId) as
       | LeaderboardPostRow
-      | undefined
+      | null
     return row ? mapLeaderboardPost(row) : null
   })
 
@@ -264,7 +264,7 @@ const getRecoveryStateActual = (
   toResult(() => {
     const row = db.prepare('SELECT * FROM recovery_state WHERE channel_id = ?').get(channelId) as
       | RecoveryStateRow
-      | undefined
+      | null
     return row ? mapRecoveryState(row) : null
   })
 
@@ -322,7 +322,7 @@ export const deleteMonitoredChannel = (db: Database, channelId: string): Result<
 const isMonitoredChannelActual = (db: Database, channelId: string): Result<boolean, Error> =>
   toResult(() => {
     const row = db.prepare('SELECT 1 FROM monitored_channels WHERE channel_id = ?').get(channelId)
-    return row !== undefined
+    return row != null
   })
 
 export const isMonitoredChannel = (db: Database, channelId: string): Result<boolean, Error> =>
@@ -335,7 +335,7 @@ const getMonitoredChannelByLeaderboardActual = (
   toResult(() => {
     const row = db
       .prepare('SELECT * FROM monitored_channels WHERE leaderboard_channel_id = ?')
-      .get(leaderboardChannelId) as MonitoredChannelRow | undefined
+      .get(leaderboardChannelId) as MonitoredChannelRow | null
     return row ? mapMonitoredChannel(row) : null
   })
 
@@ -370,7 +370,7 @@ export const claimProcessedMessage = (
 const hasProcessedMessageActual = (db: Database, messageId: string): Result<boolean, Error> =>
   toResult(() => {
     const row = db.prepare('SELECT 1 FROM processed_messages WHERE message_id = ?').get(messageId)
-    return row !== undefined
+    return row != null
   })
 
 export const hasProcessedMessage = (db: Database, messageId: string): Result<boolean, Error> =>

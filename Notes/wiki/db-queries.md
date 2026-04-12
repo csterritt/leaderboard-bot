@@ -1,6 +1,6 @@
 # db/queries.ts
 
-All exported database operations for the leaderboard bot. Every function follows the `fn` / `fnActual` pattern: the public export wraps a private `*Actual` function in `withRetry`; the `*Actual` function uses `toResult` to normalise exceptions. All return types are `Result<T, Error>` (synchronous, better-sqlite3).
+All exported database operations for the leaderboard bot. Every function follows the `fn` / `fnActual` pattern: the public export wraps a private `*Actual` function in `withRetry`; the `*Actual` function uses `toResult` to normalise exceptions. All return types are `Result<T, Error>` (synchronous, bun:sqlite).
 
 ## getUserStats / upsertUserStats
 

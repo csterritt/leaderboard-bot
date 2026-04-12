@@ -1,6 +1,6 @@
-import type BetterSqlite3 from 'better-sqlite3'
+import type { Database } from 'bun:sqlite'
 
-export type Database = BetterSqlite3.Database
+export type { Database }
 
 export interface UserStats {
   readonly channelId: string

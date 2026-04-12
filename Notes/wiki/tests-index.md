@@ -19,7 +19,7 @@ Integration tests for the startup wiring and the gateway-to-database path.
 
 ## Test approach
 
-- In-memory better-sqlite3 database with `schema.sql` applied per test.
+- In-memory bun:sqlite database with `schema.sql` applied per test.
 - Minimal fake Discord client built from `EventEmitter`.
 - Direct use of production query and service functions rather than mocks for the main integration path.
 

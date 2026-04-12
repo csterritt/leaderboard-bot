@@ -17,7 +17,7 @@ Exercises the HTTP interaction path end-to-end with real handler logic, in-memor
 ## Test approach
 
 - Uses `handleInteractionWithVerifier` with an injected verifier for deterministic signature control.
-- Uses an in-memory better-sqlite3 database with the real schema.
+- Uses an in-memory bun:sqlite database with the real schema.
 - Seeds real DB rows via query helpers instead of mocking persistence.
 - Resets Discord rate-limit state between tests via `_resetRateLimit()`.
 

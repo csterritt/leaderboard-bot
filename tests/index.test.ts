@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import Database from 'better-sqlite3'
+import { Database } from 'bun:sqlite'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { EventEmitter } from 'events'
@@ -13,7 +13,7 @@ const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), '
 function makeDb(): DatabaseType {
   const db = new Database(':memory:')
   db.exec(schema)
-  db.pragma('foreign_keys = ON')
+  db.exec('PRAGMA foreign_keys = ON')
   return db
 }
 

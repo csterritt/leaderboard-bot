@@ -23,5 +23,5 @@
 ## Test approach
 
 - Uses `vi.stubGlobal('fetch', ...)` to mock the Discord API.
-- In-memory better-sqlite3 database per test.
+- In-memory bun:sqlite database per test.
 - Counts fetch call invocations to verify pagination loops.

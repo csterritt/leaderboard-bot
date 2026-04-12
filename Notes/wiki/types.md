@@ -6,7 +6,7 @@
 
 | Type                   | Purpose                                                                 |
 | ---------------------- | ----------------------------------------------------------------------- |
-| `Database`             | Alias for `BetterSqlite3.Database`                                      |
+| `Database`             | Re-export of `Database` from `bun:sqlite`                               |
 | `UserStats`            | Row shape returned from `user_stats` queries                            |
 | `UpsertUserStatsInput` | Input shape for `upsertUserStats` (requires non-null `lastMusicPostAt`) |
 | `LeaderboardRow`       | `{ username, runCount, highestRunSeen }` — leaderboard display row      |

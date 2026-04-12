@@ -25,7 +25,7 @@ const createShutdown = (resources: ShutdownResources): (() => void)
    - Clears the hourly `setInterval` (if `intervalId` is not null)
    - Stops the Bun HTTP server
    - Destroys the discord.js client (closes the gateway connection)
-   - Closes the better-sqlite3 database
+   - Closes the bun:sqlite database
 2. Subsequent calls are no-ops (idempotent).
 3. Logs `[shutdown] shutting down gracefully...`, per-resource cleanup messages, and `[shutdown] complete`.
 

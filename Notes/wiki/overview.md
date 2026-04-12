@@ -15,15 +15,15 @@ A Discord bot that:
 | Concern         | Choice                                                     |
 | --------------- | ---------------------------------------------------------- |
 | Runtime         | Bun                                                        |
-| Database        | better-sqlite3 (synchronous, Node native module)           |
+| Database        | bun:sqlite (Bun built-in synchronous SQLite3 driver)      |
 | Discord library | discord.js (handles gateway, heartbeat, reconnect, resume) |
-| Testing         | vitest with in-memory better-sqlite3 databases             |
+| Testing         | vitest via `bun --bun vitest run` with in-memory bun:sqlite databases |
 | Result type     | true-myth `Result<T, Error>`                               |
 | Language        | TypeScript (strict mode, bundler moduleResolution)         |
 
 ## Key Design Decisions
 
-- **Sync DB**: better-sqlite3 is synchronous; all DB functions return `Result<T, Error>` (not Promise).
+- **Sync DB**: bun:sqlite is synchronous; all DB functions return `Result<T, Error>` (not Promise).
 - **Result pattern**: every exported DB function uses `withRetry` → `*Actual` → `toResult`.
 - **Idempotency**: `processed_messages` table prevents double-processing by both gateway and recovery paths.
 - **Single transaction**: `processMessage` performs claim + stats mutation atomically.

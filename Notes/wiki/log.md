@@ -159,3 +159,18 @@ Added missing documentation pages:
 - `e2e-tests.md`
 
 No source code or database schema changes were made during this pass; this was a documentation-only maintenance update.
+
+## [2026-04-08] migrate | Database driver: better-sqlite3 → bun:sqlite (pure)
+
+Migrated the database access layer from `better-sqlite3` to `bun:sqlite` (Bun's built-in SQLite driver). No schema changes. No `better-sqlite3` dependency remains.
+
+Changes:
+- `src/types.ts`: `Database` type now re-exported from `bun:sqlite` instead of `BetterSqlite3.Database`.
+- `src/index.ts`: import changed from `better-sqlite3` to `bun:sqlite`; `db.pragma('foreign_keys = ON')` → `db.exec('PRAGMA foreign_keys = ON')`.
+- All 11 test files (`tests/*.test.ts` + `e2e-tests/**/*.test.ts`): import changed to `bun:sqlite`; `db.pragma()` → `db.exec('PRAGMA ...')`.
+- `src/db/queries.ts`: fixed `null` vs `undefined` — `bun:sqlite` `.get()` returns `null` for no-match (not `undefined`). Changed `as ... | undefined` → `as ... | null`, `!== undefined` → `!= null`.
+- Test assertions: `.toBeUndefined()` → `.toBeNull()`, `.toBeDefined()` → `.not.toBeNull()` for `.get()` results.
+- `package.json`: removed `better-sqlite3`, `@types/better-sqlite3`, and `postinstall` script entirely. Test scripts now use `bun --bun vitest run` for native `bun:sqlite` resolution.
+- `vitest.config.ts`: removed `resolve.alias` — `bun --bun` resolves `bun:sqlite` natively.
+
+All 304 tests pass (20 test files).

@@ -9,7 +9,7 @@ The main entry point that wires all subsystems together and starts the bot.
 ## Startup Sequence
 
 1. **Environment** — reads `DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`, `DATABASE_PATH` (default: `leaderboard.db`), `PORT` (default: `3000`) from `process.env`. Logs `[startup] reading environment configuration` and `[startup] DATABASE_PATH=... PORT=...`.
-2. **Database** — opens better-sqlite3 at `DATABASE_PATH`, enables `PRAGMA foreign_keys = ON`, applies `src/db/schema.sql` (idempotent `CREATE TABLE IF NOT EXISTS`). Logs `[startup] opening database` and `[startup] database schema applied`.
+2. **Database** — opens bun:sqlite at `DATABASE_PATH`, enables `PRAGMA foreign_keys = ON` via `db.exec()`, applies `src/db/schema.sql` (idempotent `CREATE TABLE IF NOT EXISTS`). Logs `[startup] opening database` and `[startup] database schema applied`.
 3. **Discord Client** — creates `discord.js` `Client` with intents: `Guilds`, `GuildMessages`, `MessageContent`. Logs `[startup] creating Discord client`.
 4. **Gateway handler** — `setupGatewayHandler(client, db)` registers `messageCreate` listener. Logs `[startup] setting up gateway handler`.
 5. **HTTP server** — `Bun.serve` on `PORT`; routes `POST /interactions` to `handleInteraction`; returns `404` for all other paths. Logs `[startup] starting HTTP server on port ...` and `[startup] HTTP server listening on port ...`.

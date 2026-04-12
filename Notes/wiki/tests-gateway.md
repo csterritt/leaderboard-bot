@@ -15,5 +15,5 @@
 
 - Uses `EventEmitter` as a fake discord.js `Client`.
 - Emits `messageCreate` events directly with gateway-shaped message objects.
-- In-memory better-sqlite3 database per test.
+- In-memory bun:sqlite database per test.
 - Verifies DB state after event emission.

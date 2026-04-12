@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import Database from 'better-sqlite3'
+import { Database } from 'bun:sqlite'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import type { Database as DatabaseType } from '../src/types'

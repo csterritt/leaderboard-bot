@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import Database from 'better-sqlite3'
+import { Database } from 'bun:sqlite'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import {
@@ -20,7 +20,7 @@ const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), '
 function makeDb(): DatabaseType {
   const db = new Database(':memory:')
   db.exec(schema)
-  db.pragma('foreign_keys = ON')
+  db.exec('PRAGMA foreign_keys = ON')
   return db
 }
 
@@ -252,7 +252,7 @@ describe('processMessage', () => {
     const msg = makeMsg()
     processMessage(db, msg)
     const row = db.prepare('SELECT * FROM recovery_state WHERE channel_id = ?').get(MC_ID)
-    expect(row).toBeUndefined()
+    expect(row).toBeNull()
   })
 
   it('performs claim + stats mutation in a single transaction (atomically)', () => {
@@ -271,7 +271,7 @@ describe('processMessage', () => {
     const result = processMessage(db, msg)
     expect(result.isOk).toBe(false)
     const claimed = db.prepare('SELECT 1 FROM processed_messages WHERE message_id = ?').get(msg.id)
-    expect(claimed).toBeUndefined()
+    expect(claimed).toBeNull()
   })
 
   it('accumulates run_count on successive valid messages from same user', () => {

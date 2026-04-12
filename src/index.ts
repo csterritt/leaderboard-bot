@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits } from 'discord.js'
-import Database from 'better-sqlite3'
+import { Database } from 'bun:sqlite'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { setupGatewayHandler } from './handlers/gateway'
@@ -21,7 +21,7 @@ console.log(`[startup] DATABASE_PATH=${DATABASE_PATH} PORT=${HTTP_PORT}`)
 
 console.log('[startup] opening database')
 const db = new Database(DATABASE_PATH)
-db.pragma('foreign_keys = ON')
+db.exec('PRAGMA foreign_keys = ON')
 const schema = readFileSync(join(import.meta.dirname, 'db/schema.sql'), 'utf8')
 db.exec(schema)
 console.log('[startup] database schema applied')
