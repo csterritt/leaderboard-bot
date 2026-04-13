@@ -36,3 +36,4 @@ tmp/
 Notes/wiki/.obsidian/
 .dev.vars
 .env
+leaderboard.db

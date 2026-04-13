@@ -30,14 +30,20 @@ export const recoverChannel = async (
 ): Promise<Result<number, Error>> => {
   logger.log(`[recovery] starting recovery for channel: ${channelId}`)
   const stateResult = getRecoveryState(db, channelId)
-  if (!stateResult.isOk) return Result.err(stateResult.error)
+  if (!stateResult.isOk) {
+    logger.error(`[recovery] failed to get recovery state for channel ${channelId}: ${stateResult.error}`)
+    return Result.err(stateResult.error)
+  }
 
   let cursor = stateResult.value?.lastProcessedMessageId ?? '0'
   let totalProcessed = 0
 
   while (true) {
     const fetchResult = await fetchMessagesAfter(token, channelId, cursor)
-    if (!fetchResult.isOk) return Result.err(fetchResult.error)
+    if (!fetchResult.isOk) {
+      logger.error(`[recovery] failed to fetch messages for channel ${channelId}: ${fetchResult.error}`)
+      return Result.err(fetchResult.error)
+    }
 
     const messages = fetchResult.value
     if (messages.length === 0) break
@@ -47,13 +53,19 @@ export const recoverChannel = async (
     for (const raw of sorted) {
       const msg = normalizeDiscordMessage(raw)
       const processResult = processMessage(db, msg)
-      if (!processResult.isOk) return Result.err(processResult.error)
+      if (!processResult.isOk) {
+        logger.error(`[recovery] failed to process message ${raw.id} in channel ${channelId}: ${processResult.error}`)
+        return Result.err(processResult.error)
+      }
 
       const advanceResult = upsertRecoveryState(db, {
         channelId,
         lastProcessedMessageId: raw.id,
       })
-      if (!advanceResult.isOk) return Result.err(advanceResult.error)
+      if (!advanceResult.isOk) {
+        logger.error(`[recovery] failed to advance recovery state for channel ${channelId}: ${advanceResult.error}`)
+        return Result.err(advanceResult.error)
+      }
 
       cursor = raw.id
       if (processResult.value) totalProcessed++
@@ -71,12 +83,18 @@ export const recoverAllChannels = async (
   token: string,
 ): Promise<Result<void, Error>> => {
   const channelsResult = getMonitoredChannels(db)
-  if (!channelsResult.isOk) return Result.err(channelsResult.error)
+  if (!channelsResult.isOk) {
+    logger.error(`[recovery] failed to get monitored channels: ${channelsResult.error}`)
+    return Result.err(channelsResult.error)
+  }
 
   logger.log(`[recovery] recovering ${channelsResult.value.length} channel(s)`)
   for (const channel of channelsResult.value) {
     const result = await recoverChannel(db, token, channel.channelId)
-    if (!result.isOk) return Result.err(result.error)
+    if (!result.isOk) {
+      logger.error(`[recovery] failed to recover channel ${channel.channelId}: ${result.error}`)
+      return Result.err(result.error)
+    }
   }
 
   logger.log('[recovery] all channels recovery complete')
