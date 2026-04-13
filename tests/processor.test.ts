@@ -6,14 +6,15 @@ import {
   processMessage,
   normalizeGatewayMessage,
   normalizeDiscordMessage,
-} from '../src/services/processor'
+} from '../src/services/processor.js'
+import { logger } from '../src/utils/logger.js'
 import {
   addMonitoredChannel,
   upsertLeaderboardChannel,
   getUserStats,
   hasProcessedMessage,
-} from '../src/db/queries'
-import type { Database as DatabaseType, NormalizedMessage, DiscordMessage } from '../src/types'
+} from '../src/db/queries.js'
+import type { Database as DatabaseType, NormalizedMessage, DiscordMessage } from '../src/types.js'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf8')
 
@@ -302,14 +303,14 @@ describe('processMessage logging', () => {
   })
 
   it('logs when skipping bot message', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     const msg = makeMsg({ author: { id: 'bot-1', username: 'bot', globalName: null, isBot: true } })
     processMessage(db, msg)
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[processor] skipping bot message'))
   })
 
   it('logs when skipping non-default message type', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     const msg = makeMsg({ type: 20 })
     processMessage(db, msg)
     expect(logSpy).toHaveBeenCalledWith(
@@ -318,7 +319,7 @@ describe('processMessage logging', () => {
   })
 
   it('logs when skipping message without music attachment', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     const msg = makeMsg({ attachments: [{ filename: 'photo.png' }] })
     processMessage(db, msg)
     expect(logSpy).toHaveBeenCalledWith(
@@ -327,7 +328,7 @@ describe('processMessage logging', () => {
   })
 
   it('logs when skipping message in non-monitored channel', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     const msg = makeMsg({ channelId: 'not-monitored' })
     processMessage(db, msg)
     expect(logSpy).toHaveBeenCalledWith(
@@ -336,7 +337,7 @@ describe('processMessage logging', () => {
   })
 
   it('logs when stats are updated', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     const msg = makeMsg()
     processMessage(db, msg)
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[processor] stats updated'))
@@ -344,7 +345,7 @@ describe('processMessage logging', () => {
 
   it('logs error when processing fails', () => {
     db.exec('DROP TABLE user_stats')
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
     const msg = makeMsg()
     processMessage(db, msg)
     expect(errorSpy).toHaveBeenCalledWith(

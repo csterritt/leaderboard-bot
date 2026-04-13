@@ -1,9 +1,10 @@
 import { Result } from 'true-myth'
-import { getRecoveryState, upsertRecoveryState, getMonitoredChannels } from '../db/queries'
-import { fetchMessagesAfter } from './discord'
-import { processMessage } from './processor'
-import { normalizeDiscordMessage } from './processor'
-import type { Database } from '../types'
+import { getRecoveryState, upsertRecoveryState, getMonitoredChannels } from '../db/queries.js'
+import { fetchMessagesAfter } from './discord.js'
+import { processMessage } from './processor.js'
+import { normalizeDiscordMessage } from './processor.js'
+import type { Database } from '../types.js'
+import { logger } from '../utils/logger.js'
 
 const compareDiscordMessageIds = (left: string, right: string): number => {
   const numericPattern = /^\d+$/
@@ -27,7 +28,7 @@ export const recoverChannel = async (
   token: string,
   channelId: string,
 ): Promise<Result<number, Error>> => {
-  console.log(`[recovery] starting recovery for channel: ${channelId}`)
+  logger.log(`[recovery] starting recovery for channel: ${channelId}`)
   const stateResult = getRecoveryState(db, channelId)
   if (!stateResult.isOk) return Result.err(stateResult.error)
 
@@ -59,7 +60,7 @@ export const recoverChannel = async (
     }
   }
 
-  console.log(`[recovery] channel ${channelId}: processed ${totalProcessed} message(s)`)
+  logger.log(`[recovery] channel ${channelId}: processed ${totalProcessed} message(s)`)
   return Result.ok(totalProcessed)
 }
 
@@ -72,12 +73,12 @@ export const recoverAllChannels = async (
   const channelsResult = getMonitoredChannels(db)
   if (!channelsResult.isOk) return Result.err(channelsResult.error)
 
-  console.log(`[recovery] recovering ${channelsResult.value.length} channel(s)`)
+  logger.log(`[recovery] recovering ${channelsResult.value.length} channel(s)`)
   for (const channel of channelsResult.value) {
     const result = await recoverChannel(db, token, channel.channelId)
     if (!result.isOk) return Result.err(result.error)
   }
 
-  console.log('[recovery] all channels recovery complete')
+  logger.log('[recovery] all channels recovery complete')
   return Result.ok(undefined)
 }

@@ -1,5 +1,5 @@
-import { verifyDiscordSignature } from '../utils/signature'
-import { hasAdministratorPermission } from '../utils/permissions'
+import { verifyDiscordSignature } from '../utils/signature.js'
+import { hasAdministratorPermission } from '../utils/permissions.js'
 import {
   getLeaderboardChannel,
   upsertLeaderboardChannel,
@@ -9,10 +9,11 @@ import {
   deleteMonitoredChannel,
   getMonitoredChannelByLeaderboard,
   getLeaderboard,
-} from '../db/queries'
-import { fetchChannel } from '../services/discord'
-import { formatLeaderboard } from '../services/leaderboard'
-import type { Database, DiscordInteraction } from '../types'
+} from '../db/queries.js'
+import { fetchChannel } from '../services/discord.js'
+import { formatLeaderboard } from '../services/leaderboard.js'
+import type { Database, DiscordInteraction } from '../types.js'
+import { logger } from '../utils/logger.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -210,13 +211,13 @@ async function routeInteraction(
   token: string,
 ): Promise<Response> {
   if (interaction.type === 1) {
-    console.log('[interactions] ping received')
+    logger.log('[interactions] ping received')
     return Response.json({ type: 1 }, { status: 200 })
   }
 
   if (interaction.type === 2) {
     const commandName = interaction.data?.name
-    console.log(`[interactions] command received: ${commandName} id=${interaction.id}`)
+    logger.log(`[interactions] command received: ${commandName} id=${interaction.id}`)
 
     let response: Response
     switch (commandName) {
@@ -236,14 +237,14 @@ async function routeInteraction(
         response = handleRemoveMonitoredChannel(interaction, db)
         break
       default:
-        console.warn(`[interactions] unknown command: ${commandName}`)
+        logger.warn(`[interactions] unknown command: ${commandName}`)
         return new Response('Unknown command', { status: 400 })
     }
-    console.log(`[interactions] command completed: ${commandName} status=${response.status}`)
+    logger.log(`[interactions] command completed: ${commandName} status=${response.status}`)
     return response
   }
 
-  console.warn(`[interactions] unknown interaction type: ${interaction.type}`)
+  logger.warn(`[interactions] unknown interaction type: ${interaction.type}`)
   return new Response('Unknown interaction type', { status: 400 })
 }
 
@@ -259,7 +260,7 @@ export const handleInteractionWithVerifier = async (
   const timestamp = request.headers.get('x-signature-timestamp')
 
   if (!signature || !timestamp) {
-    console.warn('[interactions] missing signature headers')
+    logger.warn('[interactions] missing signature headers')
     return new Response('Missing signature headers', { status: 401 })
   }
 
@@ -267,10 +268,10 @@ export const handleInteractionWithVerifier = async (
 
   const valid = await verifier({ timestamp, body, signature })
   if (!valid) {
-    console.warn('[interactions] invalid signature')
+    logger.warn('[interactions] invalid signature')
     return new Response('Invalid signature', { status: 401 })
   }
-  console.log('[interactions] signature verified')
+  logger.log('[interactions] signature verified')
 
   const interaction = JSON.parse(body) as DiscordInteraction
   return routeInteraction(interaction, db, token)

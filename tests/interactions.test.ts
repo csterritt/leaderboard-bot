@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { Database } from 'bun:sqlite'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { handleInteraction } from '../src/handlers/interactions'
+import { handleInteraction } from '../src/handlers/interactions.js'
 import {
   upsertLeaderboardChannel,
   addMonitoredChannel,
@@ -10,8 +10,9 @@ import {
   getMonitoredChannels,
   getMonitoredChannelByLeaderboard,
   upsertUserStats,
-} from '../src/db/queries'
-import type { Database as DatabaseType, DiscordInteraction } from '../src/types'
+} from '../src/db/queries.js'
+import type { Database as DatabaseType, DiscordInteraction } from '../src/types.js'
+import { logger } from '../src/utils/logger.js'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf8')
 
@@ -101,7 +102,7 @@ async function dispatchFetch(
   body: unknown,
   mockFetch: typeof fetch,
 ): Promise<Response> {
-  vi.stubGlobal('fetch', mockFetch)
+  global.fetch = mockFetch as any
   const res = await handleInteractionWithVerifier(
     makeVerifiedRequest(body),
     db,
@@ -772,7 +773,7 @@ describe('interaction router', () => {
   })
 
   it('logs unknown command name as a warning', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {})
     await dispatch(
       db,
       makeInteraction({
@@ -784,7 +785,7 @@ describe('interaction router', () => {
   })
 
   it('logs unknown interaction type as a warning', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {})
     await dispatch(db, { type: 99, id: 'int-99', data: { name: 'foo' } })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[interactions]'))
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown interaction type'))
@@ -805,13 +806,13 @@ describe('interaction logging', () => {
   })
 
   it('logs ping received', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     await dispatch(db, { type: 1 })
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[interactions] ping received'))
   })
 
   it('logs command received and completed for /leaderboard', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     upsertLeaderboardChannel(db, {
       channelId: LC_ID,
       guildId: GUILD_ID,
@@ -833,7 +834,7 @@ describe('interaction logging', () => {
   })
 
   it('logs signature verified for valid requests', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     await dispatch(db, { type: 1 })
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('[interactions] signature verified'),
@@ -841,7 +842,7 @@ describe('interaction logging', () => {
   })
 
   it('logs warning for missing signature headers', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {})
     const req = new Request('http://localhost/interactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

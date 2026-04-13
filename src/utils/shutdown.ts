@@ -1,3 +1,5 @@
+import { logger } from './logger.js'
+
 export interface ShutdownResources {
   server: { stop(): void }
   client: { destroy(): void }
@@ -12,20 +14,20 @@ export const createShutdown = (resources: ShutdownResources): (() => void) => {
     if (isShuttingDown) return
     isShuttingDown = true
 
-    console.log('[shutdown] shutting down gracefully...')
+    logger.log('[shutdown] shutting down gracefully...')
 
     if (resources.intervalId !== null) {
-      console.log('[shutdown] clearing interval')
+      logger.log('[shutdown] clearing interval')
       clearInterval(resources.intervalId)
     }
 
-    console.log('[shutdown] stopping HTTP server')
+    logger.log('[shutdown] stopping HTTP server')
     resources.server.stop()
-    console.log('[shutdown] destroying Discord client')
+    logger.log('[shutdown] destroying Discord client')
     resources.client.destroy()
-    console.log('[shutdown] closing database')
+    logger.log('[shutdown] closing database')
     resources.db.close()
 
-    console.log('[shutdown] complete')
+    logger.log('[shutdown] complete')
   }
 }

@@ -5,8 +5,9 @@ import {
   fetchMessagesAfter,
   fetchChannel,
   _resetRateLimit,
-} from '../src/services/discord'
-import { DISCORD_API_DELAY_MS } from '../src/constants'
+} from '../src/services/discord.js'
+import { DISCORD_API_DELAY_MS } from '../src/constants.js'
+import { logger } from '../src/utils/logger.js'
 
 const TOKEN = 'Bot test-token'
 const CHANNEL_ID = 'ch-001'
@@ -38,12 +39,13 @@ function emptyResponse(status: number, headers: Record<string, string> = {}): Re
 
 beforeEach(() => {
   _resetRateLimit()
-  vi.useFakeTimers()
+  vi.spyOn(logger, 'log').mockImplementation(() => {})
+  vi.spyOn(logger, 'error').mockImplementation(() => {})
+  vi.spyOn(logger, 'warn').mockImplementation(() => {})
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
-  vi.useRealTimers()
 })
 
 // ─── discordFetch rate-limit behaviour ────────────────────────────────────────
@@ -54,12 +56,13 @@ describe('discordFetch (rate-limit behaviour via sendMessage)', () => {
       () => jsonResponse(200, { id: 'msg-a' }),
       () => jsonResponse(200, { id: 'msg-b' }),
     ])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p1 = sendMessage(TOKEN, CHANNEL_ID, 'hello')
     const p2 = sendMessage(TOKEN, CHANNEL_ID, 'world')
 
-    await vi.runAllTimersAsync()
+    await p1
+    await p2
 
     const r1 = await p1
     const r2 = await p2
@@ -74,10 +77,9 @@ describe('discordFetch (rate-limit behaviour via sendMessage)', () => {
       () => new Response(null, { status: 429, headers: { 'Retry-After': '1' } }),
       () => jsonResponse(200, { id: 'msg-retried' }),
     ])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hi')
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(true)
@@ -99,11 +101,10 @@ describe('discordFetch (rate-limit behaviour via sendMessage)', () => {
       callIndex++
       return Promise.resolve(fn())
     })
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p1 = sendMessage(TOKEN, CHANNEL_ID, 'first')
     const p2 = sendMessage(TOKEN, CHANNEL_ID, 'second')
-    await vi.runAllTimersAsync()
     await p1
     await p2
 
@@ -115,10 +116,9 @@ describe('discordFetch (rate-limit behaviour via sendMessage)', () => {
       () => new Response(null, { status: 429, headers: { 'Retry-After': '1' } }),
       () => new Response(null, { status: 429, headers: { 'Retry-After': '1' } }),
     ])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hi')
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(false)
@@ -130,10 +130,9 @@ describe('discordFetch (rate-limit behaviour via sendMessage)', () => {
 describe('sendMessage', () => {
   it('makes POST /channels/{id}/messages with correct headers and body', async () => {
     const mockFetch = makeFetchMock([() => jsonResponse(200, { id: 'msg-001' })])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'test content')
-    await vi.runAllTimersAsync()
     await p
 
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit]
@@ -147,10 +146,9 @@ describe('sendMessage', () => {
 
   it('returns Result.ok(messageId) on success', async () => {
     const mockFetch = makeFetchMock([() => jsonResponse(200, { id: 'returned-id' })])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hi')
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(true)
@@ -159,25 +157,20 @@ describe('sendMessage', () => {
 
   it('returns Result.err on non-2xx', async () => {
     const mockFetch = makeFetchMock([() => emptyResponse(500)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hi')
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(false)
   })
 
   it('returns Result.err when fetch throws', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        throw new Error('network down')
-      }),
-    )
+    global.fetch = vi.fn(async () => {
+      throw new Error('network down')
+    }) as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hi')
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(false)
@@ -192,10 +185,9 @@ describe('sendMessage', () => {
 describe('deleteMessage', () => {
   it('makes DELETE /channels/{id}/messages/{messageId}', async () => {
     const mockFetch = makeFetchMock([() => emptyResponse(204)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
-    await vi.runAllTimersAsync()
     await p
 
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit]
@@ -205,10 +197,9 @@ describe('deleteMessage', () => {
 
   it('returns Result.ok(true) on 204', async () => {
     const mockFetch = makeFetchMock([() => emptyResponse(204)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(true)
@@ -217,10 +208,9 @@ describe('deleteMessage', () => {
 
   it('returns Result.ok(true) on 404', async () => {
     const mockFetch = makeFetchMock([() => emptyResponse(404)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(true)
@@ -229,10 +219,9 @@ describe('deleteMessage', () => {
 
   it('returns Result.err on other non-2xx responses', async () => {
     const mockFetch = makeFetchMock([() => emptyResponse(403)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(false)
@@ -244,11 +233,10 @@ describe('deleteMessage', () => {
 describe('fetchMessagesAfter', () => {
   it('makes GET /channels/{id}/messages?after={afterId}&limit=100', async () => {
     const mockFetch = makeFetchMock([() => jsonResponse(200, [])])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const AFTER_ID = 'after-msg-001'
     const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, AFTER_ID)
-    await vi.runAllTimersAsync()
     await p
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit]
@@ -269,10 +257,9 @@ describe('fetchMessagesAfter', () => {
       },
     ]
     const mockFetch = makeFetchMock([() => jsonResponse(200, messages)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, '0')
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(true)
@@ -282,10 +269,9 @@ describe('fetchMessagesAfter', () => {
 
   it('returns Result.err on non-2xx', async () => {
     const mockFetch = makeFetchMock([() => emptyResponse(403)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, '0')
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(false)
@@ -297,10 +283,9 @@ describe('fetchMessagesAfter', () => {
 describe('fetchChannel', () => {
   it('makes GET /channels/{id}', async () => {
     const mockFetch = makeFetchMock([() => jsonResponse(200, { id: CHANNEL_ID, name: 'music' })])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchChannel(TOKEN, CHANNEL_ID)
-    await vi.runAllTimersAsync()
     await p
 
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit]
@@ -310,10 +295,9 @@ describe('fetchChannel', () => {
 
   it('returns Result.ok({ id, name }) on success', async () => {
     const mockFetch = makeFetchMock([() => jsonResponse(200, { id: CHANNEL_ID, name: 'my-music' })])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchChannel(TOKEN, CHANNEL_ID)
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(true)
@@ -323,10 +307,9 @@ describe('fetchChannel', () => {
 
   it('returns Result.err on non-2xx', async () => {
     const mockFetch = makeFetchMock([() => emptyResponse(404)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchChannel(TOKEN, CHANNEL_ID)
-    await vi.runAllTimersAsync()
     const result = await p
 
     expect(result.isOk).toBe(false)
@@ -338,109 +321,106 @@ describe('fetchChannel', () => {
 describe('discord service logging', () => {
   beforeEach(() => {
     _resetRateLimit()
-    vi.useFakeTimers()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
-    vi.useRealTimers()
   })
 
   it('logs when a message is sent successfully', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => jsonResponse(200, { id: 'msg-new' })])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hello')
-    await vi.runAllTimersAsync()
     await p
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] message sent'))
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] message sent:'),
+    )
   })
 
   it('logs error when sendMessage fails', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => emptyResponse(403)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hello')
-    await vi.runAllTimersAsync()
     await p
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] sendMessage failed'))
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] sendMessage failed:'),
+    )
   })
 
   it('logs when a message is deleted successfully', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => emptyResponse(204)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
-    await vi.runAllTimersAsync()
     await p
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] message deleted'))
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] message deleted:'),
+    )
   })
 
   it('logs error when deleteMessage fails', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => emptyResponse(403)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
-    await vi.runAllTimersAsync()
     await p
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] deleteMessage failed'))
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] deleteMessage failed:'),
+    )
   })
 
   it('logs when messages are fetched successfully', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => jsonResponse(200, [])])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, '0')
-    await vi.runAllTimersAsync()
     await p
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] fetched messages'))
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] fetched messages:'),
+    )
   })
 
   it('logs error when fetchMessagesAfter fails', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => emptyResponse(500)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, '0')
-    await vi.runAllTimersAsync()
     await p
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[discord] fetchMessagesAfter failed'),
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] fetchMessagesAfter failed:'),
     )
   })
 
   it('logs when a channel is fetched successfully', async () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => jsonResponse(200, { id: CHANNEL_ID, name: 'music' })])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchChannel(TOKEN, CHANNEL_ID)
-    await vi.runAllTimersAsync()
     await p
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] channel fetched'))
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] channel fetched:'),
+    )
   })
 
   it('logs error when fetchChannel fails', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const mockFetch = makeFetchMock([() => emptyResponse(404)])
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     const p = fetchChannel(TOKEN, CHANNEL_ID)
-    await vi.runAllTimersAsync()
     await p
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[discord] fetchChannel failed'))
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('[discord] fetchChannel failed:'),
+    )
   })
 })

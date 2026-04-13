@@ -15,11 +15,12 @@ import {
   getUserStats,
   getLeaderboardPost,
   upsertUserStats,
-} from '../../src/db/queries'
-import { runScheduledWork } from '../../src/handlers/scheduled'
-import { _resetRateLimit } from '../../src/services/discord'
-import { createClock } from '../../src/utils/clock'
-import type { Database as DatabaseType, DiscordMessage } from '../../src/types'
+} from '../../src/db/queries.js'
+import { runScheduledWork } from '../../src/handlers/scheduled.js'
+import { _resetRateLimit } from '../../src/services/discord.js'
+import { createClock } from '../../src/utils/clock.js'
+import type { Database as DatabaseType, DiscordMessage } from '../../src/types.js'
+import { logger } from '../../src/utils/logger.js'
 
 const schema = readFileSync(join(import.meta.dirname, '../../src/db/schema.sql'), 'utf8')
 
@@ -95,9 +96,7 @@ describe('scheduled work (e2e)', () => {
     let postedChannelId: string | null = null
     let postedContent: string | null = null
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
         const u = String(url)
         if (u.includes('/messages') && opts.method === 'POST') {
           postedChannelId = u.match(/channels\/([^/]+)\/messages/)?.[1] ?? null
@@ -105,8 +104,7 @@ describe('scheduled work (e2e)', () => {
           return new Response(JSON.stringify({ id: 'new-msg-id' }), { status: 200 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -122,9 +120,7 @@ describe('scheduled work (e2e)', () => {
     seedUserStats(db, 'bob', 3, 5)
 
     let postCallCount = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
         const u = String(url)
         if (u.includes('/messages') && opts.method === 'POST') {
           postCallCount++
@@ -134,8 +130,7 @@ describe('scheduled work (e2e)', () => {
           return new Response(null, { status: 204 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     await runScheduledWork(db, TOKEN)
     const firstPost = getLeaderboardPost(db, LC_ID)
@@ -170,7 +165,7 @@ describe('scheduled work (e2e)', () => {
         return new Response(JSON.stringify([]), { status: 200 })
       })
 
-    vi.stubGlobal('fetch', makeStub())
+    global.fetch = makeStub() as any
     await runScheduledWork(db, TOKEN)
     const post1 = getLeaderboardPost(db, LC_ID)
     expect(post1.value?.messageId).toBe('msg-post-1')
@@ -184,7 +179,7 @@ describe('scheduled work (e2e)', () => {
       highestRunSeen: 10,
     })
 
-    vi.stubGlobal('fetch', makeStub())
+    global.fetch = makeStub() as any
     await runScheduledWork(db, TOKEN)
 
     expect(deletedMsgIds).toContain('msg-post-1')
@@ -198,13 +193,10 @@ describe('scheduled work (e2e)', () => {
   it('does nothing when there are no leaderboard channels configured', async () => {
     const emptyDb = makeDb()
     let fetchCalled = false
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    global.fetch = vi.fn(async () => {
         fetchCalled = true
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(emptyDb, TOKEN)
     expect(result.isOk).toBe(true)
@@ -240,9 +232,7 @@ describe('scheduled work (e2e)', () => {
     })
 
     const postedChannels: string[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
         const u = String(url)
         if (u.includes('/messages') && opts.method === 'POST') {
           const ch = u.match(/channels\/([^/]+)\/messages/)?.[1]
@@ -250,8 +240,7 @@ describe('scheduled work (e2e)', () => {
           return new Response(JSON.stringify({ id: `msg-${ch}` }), { status: 200 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -270,9 +259,7 @@ describe('scheduled work (e2e)', () => {
     const newMessage: DiscordMessage = makeDiscordMessage('msg-from-recovery', 'helen', t0)
     let recoveryCallCount = 0
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
         const u = String(url)
         const method = opts?.method ?? 'GET'
         if (u.includes(`/channels/${MC_ID}/messages`) && method === 'GET') {
@@ -286,8 +273,7 @@ describe('scheduled work (e2e)', () => {
           return new Response(JSON.stringify({ id: 'posted-msg' }), { status: 200 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -300,9 +286,7 @@ describe('scheduled work (e2e)', () => {
     seedUserStats(db, 'ivan', 5, 5)
 
     let deletedMsgId: string | null = null
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
         const u = String(url)
         if (u.includes('/messages') && opts.method === 'POST') {
           return new Response(JSON.stringify({ id: 'posted-msg-ivan' }), { status: 200 })
@@ -312,8 +296,7 @@ describe('scheduled work (e2e)', () => {
           return new Response(null, { status: 204 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     await runScheduledWork(db, TOKEN)
     const post = getLeaderboardPost(db, LC_ID)
@@ -337,16 +320,13 @@ describe('scheduled work (e2e)', () => {
       VALUES ('old-msg', ?, ?)
     `).run(MC_ID, oldDate)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
         const u = String(url)
         if (u.includes('/messages') && opts.method === 'POST') {
           return new Response(JSON.stringify({ id: 'new-post' }), { status: 200 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     await runScheduledWork(db, TOKEN)
 

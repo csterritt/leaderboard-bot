@@ -16,10 +16,12 @@ import {
   getUserStats,
   getRecoveryState,
   hasProcessedMessage,
-} from '../../src/db/queries'
-import { recoverChannel, recoverAllChannels } from '../../src/services/recovery'
-import { createClock } from '../../src/utils/clock'
-import type { Database as DatabaseType, DiscordMessage } from '../../src/types'
+} from '../../src/db/queries.js'
+import { recoverChannel, recoverAllChannels } from '../../src/services/recovery.js'
+import { _resetRateLimit } from '../../src/services/discord.js'
+import { createClock } from '../../src/utils/clock.js'
+import type { Database as DatabaseType, DiscordMessage } from '../../src/types.js'
+import { logger } from '../../src/utils/logger.js'
 
 const schema = readFileSync(join(import.meta.dirname, '../../src/db/schema.sql'), 'utf8')
 
@@ -76,6 +78,7 @@ describe('recovery pipeline (e2e)', () => {
     seedChannels(db)
     clock = createClock()
     clock.set(1_700_000_000)
+    _resetRateLimit()
     vi.resetAllMocks()
   })
 
@@ -92,15 +95,12 @@ describe('recovery pipeline (e2e)', () => {
     ]
 
     let call = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    global.fetch = vi.fn(async () => {
         call++
         return call === 1
           ? new Response(JSON.stringify(messages), { status: 200 })
           : new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -122,16 +122,13 @@ describe('recovery pipeline (e2e)', () => {
     const page3: DiscordMessage[] = [makeDiscordMessage('msg-300', 'bob', t0 + 24 * 3600)]
 
     let call = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    global.fetch = vi.fn(async () => {
         call++
         if (call === 1) return new Response(JSON.stringify(page1), { status: 200 })
         if (call === 2) return new Response(JSON.stringify(page2), { status: 200 })
         if (call === 3) return new Response(JSON.stringify(page3), { status: 200 })
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -153,31 +150,25 @@ describe('recovery pipeline (e2e)', () => {
     ]
 
     let call = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    global.fetch = vi.fn(async () => {
         call++
         return call === 1
           ? new Response(JSON.stringify(firstBatch), { status: 200 })
           : new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     vi.restoreAllMocks()
 
     const secondBatch: DiscordMessage[] = [makeDiscordMessage('msg-003', 'carol', t0 + 24 * 3600)]
     const capturedUrls: string[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
         capturedUrls.push(String(url))
         call++
         return call === 3
           ? new Response(JSON.stringify(secondBatch), { status: 200 })
           : new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -197,15 +188,12 @@ describe('recovery pipeline (e2e)', () => {
     )
 
     let call = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    global.fetch = vi.fn(async () => {
         call++
         return call === 1
           ? new Response(JSON.stringify([msg]), { status: 200 })
           : new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -229,15 +217,12 @@ describe('recovery pipeline (e2e)', () => {
     ]
 
     let call = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    global.fetch = vi.fn(async () => {
         call++
         return call === 1
           ? new Response(JSON.stringify(messages), { status: 200 })
           : new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -261,15 +246,12 @@ describe('recovery pipeline (e2e)', () => {
     ]
 
     let call = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
+    global.fetch = vi.fn(async () => {
         call++
         return call === 1
           ? new Response(JSON.stringify(messages), { status: 200 })
           : new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
 
@@ -292,19 +274,14 @@ describe('recovery pipeline (e2e)', () => {
     addMonitoredChannel(db, { channelId: MC2, guildId: GUILD_ID, leaderboardChannelId: LC2 })
 
     const t0 = clock.now()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
         const channelId = (url as string).match(/channels\/([^/]+)\/messages/)?.[1]
         const msg = makeDiscordMessage('msg-x', 'userx', t0, { channel_id: channelId ?? MC_ID })
         return new Response(JSON.stringify([msg]), { status: 200 })
-      }),
-    )
+      }) as any
 
     let call = 0
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string) => {
         call++
         const channelId = (url as string).match(/channels\/([^/]+)\/messages/)?.[1] ?? MC_ID
         if (call % 2 === 1) {
@@ -314,8 +291,7 @@ describe('recovery pipeline (e2e)', () => {
           return new Response(JSON.stringify([msg]), { status: 200 })
         }
         return new Response(JSON.stringify([]), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await recoverAllChannels(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -333,16 +309,13 @@ describe('recovery pipeline (e2e)', () => {
       makeDiscordMessage('msg-002', 'grace', t0 + 12 * 3600),
     ]
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, _opts: unknown) => {
+    global.fetch = vi.fn(async (url: string, _opts: unknown) => {
         const afterMatch = (url as string).match(/after=([^&]+)/)
         const after = afterMatch?.[1] ?? '0'
         const unprocessed = messages.filter((m) => m.id > after)
         if (unprocessed.length === 0) return new Response(JSON.stringify([]), { status: 200 })
         return new Response(JSON.stringify(unprocessed), { status: 200 })
-      }),
-    )
+      }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     const resultSecond = await recoverChannel(db, TOKEN, MC_ID)

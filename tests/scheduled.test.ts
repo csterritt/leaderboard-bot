@@ -9,9 +9,10 @@ import {
   getLeaderboardPost,
   claimProcessedMessage,
   upsertUserStats,
-} from '../src/db/queries'
-import { runScheduledWork } from '../src/handlers/scheduled'
-import type { Database as DatabaseType } from '../src/types'
+} from '../src/db/queries.js'
+import { runScheduledWork } from '../src/handlers/scheduled.js'
+import type { Database as DatabaseType } from '../src/types.js'
+import { logger } from '../src/utils/logger.js'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf8')
 
@@ -57,8 +58,8 @@ describe('runScheduledWork', () => {
 
   it('does nothing when there are no configured leaderboard channels', async () => {
     const mockFetch = vi.fn()
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.stubGlobal('fetch', mockFetch)
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
+    global.fetch = mockFetch as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -72,9 +73,7 @@ describe('runScheduledWork', () => {
     seedLeaderboardChannel(db)
     const callOrder: string[] = []
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         const urlStr = String(url)
         if (opts?.method === 'GET' && urlStr.includes('/messages?after=')) {
           callOrder.push('recovery')
@@ -85,8 +84,7 @@ describe('runScheduledWork', () => {
           return new Response(JSON.stringify({ id: 'new-msg-1' }), { status: 200 })
         }
         return new Response(JSON.stringify({ id: 'new-msg-1' }), { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -108,9 +106,7 @@ describe('runScheduledWork', () => {
     addMonitoredChannel(db, { channelId: 'mc-2', guildId: GUILD_ID, leaderboardChannelId: 'lc-2' })
 
     const postedTo: string[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         const urlStr = String(url)
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST') {
@@ -119,8 +115,7 @@ describe('runScheduledWork', () => {
           return new Response(JSON.stringify({ id: 'msg-' + postedTo.length }), { status: 200 })
         }
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -140,9 +135,7 @@ describe('runScheduledWork', () => {
     })
 
     let postedContent = ''
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         const urlStr = String(url)
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST') {
@@ -151,8 +144,7 @@ describe('runScheduledWork', () => {
           return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
         }
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -188,9 +180,7 @@ describe('runScheduledWork', () => {
     })
 
     const postsByChannel: Record<string, string> = {}
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         const urlStr = String(url)
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST') {
@@ -200,8 +190,7 @@ describe('runScheduledWork', () => {
           return new Response(JSON.stringify({ id: 'msg-x' }), { status: 200 })
         }
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -221,13 +210,10 @@ describe('runScheduledWork', () => {
     upsertLeaderboardPost(db, { channelId: LC_ID, messageId: 'old-msg', contentHash: 'oldhash' })
 
     const deletedUrls: string[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'DELETE') deletedUrls.push(String(url))
         return new Response(null, { status: 204 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -246,7 +232,7 @@ describe('runScheduledWork', () => {
         return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
       return new Response('{}', { status: 200 })
     })
-    vi.stubGlobal('fetch', mockFetch)
+    global.fetch = mockFetch as any
 
     await runScheduledWork(db, TOKEN)
 
@@ -279,9 +265,7 @@ describe('runScheduledWork', () => {
     })
 
     const callOrder: string[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         const urlStr = String(url)
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'DELETE') {
@@ -293,8 +277,7 @@ describe('runScheduledWork', () => {
           return new Response(JSON.stringify({ id: 'new-msg' }), { status: 200 })
         }
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -319,16 +302,13 @@ describe('runScheduledWork', () => {
       highestRunSeen: 1,
     })
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'DELETE') return new Response('Not Found', { status: 404 })
         if (opts?.method === 'POST')
           return new Response(JSON.stringify({ id: 'new-msg' }), { status: 200 })
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -345,15 +325,12 @@ describe('runScheduledWork', () => {
       highestRunSeen: 1,
     })
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST')
           return new Response(JSON.stringify({ id: 'msg-posted' }), { status: 200 })
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -377,15 +354,12 @@ describe('runScheduledWork', () => {
       VALUES (?, ?, datetime('now', '-1 days'))
     `).run('recent-msg', MC_ID)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST')
           return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -403,16 +377,13 @@ describe('runScheduledWork', () => {
 
   it('logs start and completion of scheduled work', async () => {
     seedLeaderboardChannel(db)
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST')
           return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -427,19 +398,16 @@ describe('runScheduledWork', () => {
   it('logs when leaderboard content is unchanged', async () => {
     seedLeaderboardChannel(db)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST')
           return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     await runScheduledWork(db, TOKEN)
 
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     await runScheduledWork(db, TOKEN)
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('[scheduled] leaderboard unchanged'),
@@ -457,16 +425,13 @@ describe('runScheduledWork', () => {
       highestRunSeen: 1,
     })
 
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST')
           return new Response(JSON.stringify({ id: 'msg-posted' }), { status: 200 })
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -478,16 +443,13 @@ describe('runScheduledWork', () => {
   it('logs pruned processed messages', async () => {
     seedLeaderboardChannel(db)
 
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, opts?: RequestInit) => {
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
         if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
         if (opts?.method === 'POST')
           return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
         return new Response('{}', { status: 200 })
-      }),
-    )
+      }) as any
 
     const result = await runScheduledWork(db, TOKEN)
     expect(result.isOk).toBe(true)

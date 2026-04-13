@@ -1,14 +1,15 @@
 import { Result } from 'true-myth'
-import { ACCEPTED_MESSAGE_TYPES } from '../constants'
-import { parseDiscordTimestamp } from '../utils/time'
+import { ACCEPTED_MESSAGE_TYPES } from '../constants.js'
+import { parseDiscordTimestamp } from '../utils/time.js'
 import {
   isMonitoredChannel,
   getUserStats,
   upsertUserStats,
   claimProcessedMessage,
-} from '../db/queries'
-import { hasMusicAttachment, computeNewStats, resolveUsername } from './tracker'
-import type { Database, NormalizedMessage, NormalizedAttachment, DiscordMessage } from '../types'
+} from '../db/queries.js'
+import { hasMusicAttachment, computeNewStats, resolveUsername } from './tracker.js'
+import type { Database, NormalizedMessage, NormalizedAttachment, DiscordMessage } from '../types.js'
+import { logger } from '../utils/logger.js'
 
 // ─── 4.1 Normalization helpers ────────────────────────────────────────────────
 
@@ -91,24 +92,24 @@ export const processMessage = (
   message: NormalizedMessage,
 ): Result<boolean, Error> => {
   if (message.author.isBot) {
-    console.log(`[processor] skipping bot message: id=${message.id}`)
+    logger.log(`[processor] skipping bot message: id=${message.id}`)
     return Result.ok(false)
   }
   if (!(ACCEPTED_MESSAGE_TYPES as readonly number[]).includes(message.type)) {
-    console.log(
+    logger.log(
       `[processor] skipping non-default message type: id=${message.id} type=${message.type}`,
     )
     return Result.ok(false)
   }
   if (!hasMusicAttachment(message.attachments)) {
-    console.log(`[processor] skipping message without music attachment: id=${message.id}`)
+    logger.log(`[processor] skipping message without music attachment: id=${message.id}`)
     return Result.ok(false)
   }
 
   const monitoredResult = isMonitoredChannel(db, message.channelId)
   if (!monitoredResult.isOk) return Result.err(monitoredResult.error)
   if (!monitoredResult.value) {
-    console.log(
+    logger.log(
       `[processor] skipping message in non-monitored channel: id=${message.id} channelId=${message.channelId}`,
     )
     return Result.ok(false)
@@ -124,7 +125,7 @@ export const processMessage = (
       })
       if (!claimResult.isOk) throw claimResult.error
       if (!claimResult.value) {
-        console.log(`[processor] skipping already-processed message: id=${message.id}`)
+        logger.log(`[processor] skipping already-processed message: id=${message.id}`)
         return
       }
 
@@ -145,7 +146,7 @@ export const processMessage = (
       const upsertResult = upsertUserStats(db, newStats)
       if (!upsertResult.isOk) throw upsertResult.error
 
-      console.log(
+      logger.log(
         `[processor] stats updated: userId=${message.author.id} channelId=${message.channelId} runCount=${newStats.runCount}`,
       )
       processed = true
@@ -153,7 +154,7 @@ export const processMessage = (
 
     return Result.ok(processed)
   } catch (error) {
-    console.error(
+    logger.error(
       `[processor] error processing message: id=${message.id}`,
       error instanceof Error ? error : new Error(String(error)),
     )

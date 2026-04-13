@@ -2,15 +2,16 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { Database } from 'bun:sqlite'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { setupGatewayHandler } from '../src/handlers/gateway'
+import { setupGatewayHandler } from '../src/handlers/gateway.js'
 import {
   addMonitoredChannel,
   upsertLeaderboardChannel,
   getUserStats,
   hasProcessedMessage,
-} from '../src/db/queries'
-import type { Database as DatabaseType } from '../src/types'
+} from '../src/db/queries.js'
+import type { Database as DatabaseType } from '../src/types.js'
 import { EventEmitter } from 'events'
+import { logger } from '../src/utils/logger.js'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf8')
 
@@ -114,7 +115,7 @@ describe('setupGatewayHandler', () => {
 
   it('logs and does not throw when processMessage returns an error', () => {
     db.exec('DROP TABLE user_stats')
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
 
     setupGatewayHandler(client as never, db)
     expect(() => {
@@ -125,7 +126,7 @@ describe('setupGatewayHandler', () => {
   })
 
   it('logs when a message is received', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     setupGatewayHandler(client as never, db)
 
     client.emit('messageCreate', makeGatewayMessage())
@@ -134,7 +135,7 @@ describe('setupGatewayHandler', () => {
   })
 
   it('logs when a message is processed successfully', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     setupGatewayHandler(client as never, db)
 
     client.emit('messageCreate', makeGatewayMessage())
@@ -143,7 +144,7 @@ describe('setupGatewayHandler', () => {
   })
 
   it('logs when a message is skipped (bot message)', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     setupGatewayHandler(client as never, db)
 
     const botMsg = makeGatewayMessage({
@@ -156,7 +157,7 @@ describe('setupGatewayHandler', () => {
 
   it('logs error with message id when processMessage fails', () => {
     db.exec('DROP TABLE user_stats')
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
 
     setupGatewayHandler(client as never, db)
     client.emit('messageCreate', makeGatewayMessage())

@@ -2,11 +2,13 @@
 // Run via: bun run src/scripts/register-commands.ts
 // Registers all slash commands via PUT /applications/{application_id}/commands
 
+import { logger } from '../utils/logger.js'
+
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? ''
 const DISCORD_APPLICATION_ID = process.env.DISCORD_APPLICATION_ID ?? ''
 
 if (!DISCORD_BOT_TOKEN || !DISCORD_APPLICATION_ID) {
-  console.error('DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID must be set')
+  logger.error('DISCORD_BOT_TOKEN and DISCORD_APPLICATION_ID must be set')
   process.exit(1)
 }
 
@@ -74,9 +76,9 @@ const response = await fetch(url, {
 
 if (!response.ok) {
   const body = await response.text()
-  console.error(`Failed to register commands: ${response.status}`, body)
+  logger.error(`Failed to register commands: ${response.status}`, body)
   process.exit(1)
 }
 
 const registered = await response.json()
-console.log(`Registered ${(registered as unknown[]).length} slash command(s) successfully`)
+logger.log(`Registered ${(registered as unknown[]).length} slash command(s) successfully`)

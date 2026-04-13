@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createShutdown, type ShutdownResources } from '../src/utils/shutdown'
+import { createShutdown, type ShutdownResources } from '../src/utils/shutdown.js'
+import { logger } from '../src/utils/logger.js'
 
 function makeResources(): ShutdownResources & {
   server: { stop: ReturnType<typeof vi.fn> }
@@ -78,7 +79,7 @@ describe('createShutdown', () => {
   })
 
   it('logs shutdown messages with [shutdown] prefix', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
     const resources = makeResources()
     const shutdown = createShutdown(resources)
     shutdown()
