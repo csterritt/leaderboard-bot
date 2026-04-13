@@ -1,9 +1,7 @@
 Please figure out why running:
 
-    bun --bun vitest run --dir tests
+    bun run test:coverage
 
 fails with:
 
- Test Files  1 failed | 15 passed (16)
-      Tests  6 failed | 249 passed (255)
- 
+    Error: Coverage APIs are not supported

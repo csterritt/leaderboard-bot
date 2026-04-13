@@ -335,9 +335,7 @@ describe('discord service logging', () => {
     const p = sendMessage(TOKEN, CHANNEL_ID, 'hello')
     await p
 
-    expect(logger.log).toHaveBeenCalledWith(
-      expect.stringContaining('[discord] message sent:'),
-    )
+    expect(logger.log).toHaveBeenCalledWith(expect.stringContaining('[discord] message sent:'))
   })
 
   it('logs error when sendMessage fails', async () => {
@@ -359,9 +357,7 @@ describe('discord service logging', () => {
     const p = deleteMessage(TOKEN, CHANNEL_ID, MESSAGE_ID)
     await p
 
-    expect(logger.log).toHaveBeenCalledWith(
-      expect.stringContaining('[discord] message deleted:'),
-    )
+    expect(logger.log).toHaveBeenCalledWith(expect.stringContaining('[discord] message deleted:'))
   })
 
   it('logs error when deleteMessage fails', async () => {
@@ -383,9 +379,7 @@ describe('discord service logging', () => {
     const p = fetchMessagesAfter(TOKEN, CHANNEL_ID, '0')
     await p
 
-    expect(logger.log).toHaveBeenCalledWith(
-      expect.stringContaining('[discord] fetched messages:'),
-    )
+    expect(logger.log).toHaveBeenCalledWith(expect.stringContaining('[discord] fetched messages:'))
   })
 
   it('logs error when fetchMessagesAfter fails', async () => {
@@ -407,9 +401,7 @@ describe('discord service logging', () => {
     const p = fetchChannel(TOKEN, CHANNEL_ID)
     await p
 
-    expect(logger.log).toHaveBeenCalledWith(
-      expect.stringContaining('[discord] channel fetched:'),
-    )
+    expect(logger.log).toHaveBeenCalledWith(expect.stringContaining('[discord] channel fetched:'))
   })
 
   it('logs error when fetchChannel fails', async () => {

@@ -1,6 +1,7 @@
 # Plan: Migrate from better-sqlite3 to bun:sqlite (pure — no better-sqlite3 at all)
 
 ## Assumptions
+
 - No database schema changes needed
 - `bun:sqlite`'s `db.prepare()` API is compatible with `better-sqlite3`'s
 - `@types/bun` (already in devDependencies) provides types for `bun:sqlite`
@@ -8,6 +9,7 @@
 - **No `better-sqlite3` anywhere** — not in deps, not in devDeps, not as a shim
 
 ## API Differences (better-sqlite3 → bun:sqlite)
+
 - Import: `import Database from 'better-sqlite3'` → `import { Database } from 'bun:sqlite'`
 - Type: `BetterSqlite3.Database` → `Database` from `bun:sqlite`
 - `db.pragma('foreign_keys = ON')` → `db.exec('PRAGMA foreign_keys = ON')`
@@ -16,6 +18,7 @@
 - `.run()` returns `{ changes, lastInsertRowid }` in both
 
 ## Pitfalls
+
 - `db.pragma()` does NOT exist in bun:sqlite — must use `db.exec('PRAGMA ...')`
 - `bun:sqlite` only works under Bun runtime, not Node.js
 - Must remove `postinstall` script that rebuilds better-sqlite3 native addon

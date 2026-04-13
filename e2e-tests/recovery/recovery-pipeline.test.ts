@@ -96,11 +96,11 @@ describe('recovery pipeline (e2e)', () => {
 
     let call = 0
     global.fetch = vi.fn(async () => {
-        call++
-        return call === 1
-          ? new Response(JSON.stringify(messages), { status: 200 })
-          : new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      call++
+      return call === 1
+        ? new Response(JSON.stringify(messages), { status: 200 })
+        : new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -123,12 +123,12 @@ describe('recovery pipeline (e2e)', () => {
 
     let call = 0
     global.fetch = vi.fn(async () => {
-        call++
-        if (call === 1) return new Response(JSON.stringify(page1), { status: 200 })
-        if (call === 2) return new Response(JSON.stringify(page2), { status: 200 })
-        if (call === 3) return new Response(JSON.stringify(page3), { status: 200 })
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      call++
+      if (call === 1) return new Response(JSON.stringify(page1), { status: 200 })
+      if (call === 2) return new Response(JSON.stringify(page2), { status: 200 })
+      if (call === 3) return new Response(JSON.stringify(page3), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -151,11 +151,11 @@ describe('recovery pipeline (e2e)', () => {
 
     let call = 0
     global.fetch = vi.fn(async () => {
-        call++
-        return call === 1
-          ? new Response(JSON.stringify(firstBatch), { status: 200 })
-          : new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      call++
+      return call === 1
+        ? new Response(JSON.stringify(firstBatch), { status: 200 })
+        : new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     vi.restoreAllMocks()
@@ -163,12 +163,12 @@ describe('recovery pipeline (e2e)', () => {
     const secondBatch: DiscordMessage[] = [makeDiscordMessage('msg-003', 'carol', t0 + 24 * 3600)]
     const capturedUrls: string[] = []
     global.fetch = vi.fn(async (url: string) => {
-        capturedUrls.push(String(url))
-        call++
-        return call === 3
-          ? new Response(JSON.stringify(secondBatch), { status: 200 })
-          : new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      capturedUrls.push(String(url))
+      call++
+      return call === 3
+        ? new Response(JSON.stringify(secondBatch), { status: 200 })
+        : new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -189,11 +189,11 @@ describe('recovery pipeline (e2e)', () => {
 
     let call = 0
     global.fetch = vi.fn(async () => {
-        call++
-        return call === 1
-          ? new Response(JSON.stringify([msg]), { status: 200 })
-          : new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      call++
+      return call === 1
+        ? new Response(JSON.stringify([msg]), { status: 200 })
+        : new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -218,11 +218,11 @@ describe('recovery pipeline (e2e)', () => {
 
     let call = 0
     global.fetch = vi.fn(async () => {
-        call++
-        return call === 1
-          ? new Response(JSON.stringify(messages), { status: 200 })
-          : new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      call++
+      return call === 1
+        ? new Response(JSON.stringify(messages), { status: 200 })
+        : new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -247,11 +247,11 @@ describe('recovery pipeline (e2e)', () => {
 
     let call = 0
     global.fetch = vi.fn(async () => {
-        call++
-        return call === 1
-          ? new Response(JSON.stringify(messages), { status: 200 })
-          : new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      call++
+      return call === 1
+        ? new Response(JSON.stringify(messages), { status: 200 })
+        : new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
 
@@ -275,23 +275,23 @@ describe('recovery pipeline (e2e)', () => {
 
     const t0 = clock.now()
     global.fetch = vi.fn(async (url: string) => {
-        const channelId = (url as string).match(/channels\/([^/]+)\/messages/)?.[1]
-        const msg = makeDiscordMessage('msg-x', 'userx', t0, { channel_id: channelId ?? MC_ID })
-        return new Response(JSON.stringify([msg]), { status: 200 })
-      }) as any
+      const channelId = (url as string).match(/channels\/([^/]+)\/messages/)?.[1]
+      const msg = makeDiscordMessage('msg-x', 'userx', t0, { channel_id: channelId ?? MC_ID })
+      return new Response(JSON.stringify([msg]), { status: 200 })
+    }) as any
 
     let call = 0
     global.fetch = vi.fn(async (url: string) => {
-        call++
-        const channelId = (url as string).match(/channels\/([^/]+)\/messages/)?.[1] ?? MC_ID
-        if (call % 2 === 1) {
-          const msg = makeDiscordMessage(`msg-${channelId}`, 'frank', t0, {
-            channel_id: channelId,
-          })
-          return new Response(JSON.stringify([msg]), { status: 200 })
-        }
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      call++
+      const channelId = (url as string).match(/channels\/([^/]+)\/messages/)?.[1] ?? MC_ID
+      if (call % 2 === 1) {
+        const msg = makeDiscordMessage(`msg-${channelId}`, 'frank', t0, {
+          channel_id: channelId,
+        })
+        return new Response(JSON.stringify([msg]), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverAllChannels(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -310,12 +310,12 @@ describe('recovery pipeline (e2e)', () => {
     ]
 
     global.fetch = vi.fn(async (url: string, _opts: unknown) => {
-        const afterMatch = (url as string).match(/after=([^&]+)/)
-        const after = afterMatch?.[1] ?? '0'
-        const unprocessed = messages.filter((m) => m.id > after)
-        if (unprocessed.length === 0) return new Response(JSON.stringify([]), { status: 200 })
-        return new Response(JSON.stringify(unprocessed), { status: 200 })
-      }) as any
+      const afterMatch = (url as string).match(/after=([^&]+)/)
+      const after = afterMatch?.[1] ?? '0'
+      const unprocessed = messages.filter((m) => m.id > after)
+      if (unprocessed.length === 0) return new Response(JSON.stringify([]), { status: 200 })
+      return new Response(JSON.stringify(unprocessed), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     const resultSecond = await recoverChannel(db, TOKEN, MC_ID)

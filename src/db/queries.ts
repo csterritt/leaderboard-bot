@@ -220,9 +220,9 @@ const getLeaderboardPostActual = (
   channelId: string,
 ): Result<LeaderboardPost | null, Error> =>
   toResult(() => {
-    const row = db.prepare('SELECT * FROM leaderboard_posts WHERE channel_id = ?').get(channelId) as
-      | LeaderboardPostRow
-      | null
+    const row = db
+      .prepare('SELECT * FROM leaderboard_posts WHERE channel_id = ?')
+      .get(channelId) as LeaderboardPostRow | null
     return row ? mapLeaderboardPost(row) : null
   })
 
@@ -262,9 +262,9 @@ const getRecoveryStateActual = (
   channelId: string,
 ): Result<RecoveryState | null, Error> =>
   toResult(() => {
-    const row = db.prepare('SELECT * FROM recovery_state WHERE channel_id = ?').get(channelId) as
-      | RecoveryStateRow
-      | null
+    const row = db
+      .prepare('SELECT * FROM recovery_state WHERE channel_id = ?')
+      .get(channelId) as RecoveryStateRow | null
     return row ? mapRecoveryState(row) : null
   })
 

@@ -91,9 +91,9 @@ describe('integration: recovery pass runs at startup before any scheduled interv
     const callOrder: string[] = []
 
     global.fetch = vi.fn(async () => {
-        callOrder.push('recovery-fetch')
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callOrder.push('recovery-fetch')
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const db = makeDb()
     seedChannels(db)

@@ -12,14 +12,14 @@ A Discord bot that:
 
 ## Runtime / Stack
 
-| Concern         | Choice                                                     |
-| --------------- | ---------------------------------------------------------- |
-| Runtime         | Bun                                                        |
-| Database        | bun:sqlite (Bun built-in synchronous SQLite3 driver)      |
-| Discord library | discord.js (handles gateway, heartbeat, reconnect, resume) |
+| Concern         | Choice                                                                |
+| --------------- | --------------------------------------------------------------------- |
+| Runtime         | Bun                                                                   |
+| Database        | bun:sqlite (Bun built-in synchronous SQLite3 driver)                  |
+| Discord library | discord.js (handles gateway, heartbeat, reconnect, resume)            |
 | Testing         | vitest via `bun --bun vitest run` with in-memory bun:sqlite databases |
-| Result type     | true-myth `Result<T, Error>`                               |
-| Language        | TypeScript (strict mode, bundler moduleResolution)         |
+| Result type     | true-myth `Result<T, Error>`                                          |
+| Language        | TypeScript (strict mode, bundler moduleResolution)                    |
 
 ## Key Design Decisions
 

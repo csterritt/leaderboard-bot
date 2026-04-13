@@ -165,6 +165,7 @@ No source code or database schema changes were made during this pass; this was a
 Migrated the database access layer from `better-sqlite3` to `bun:sqlite` (Bun's built-in SQLite driver). No schema changes. No `better-sqlite3` dependency remains.
 
 Changes:
+
 - `src/types.ts`: `Database` type now re-exported from `bun:sqlite` instead of `BetterSqlite3.Database`.
 - `src/index.ts`: import changed from `better-sqlite3` to `bun:sqlite`; `db.pragma('foreign_keys = ON')` → `db.exec('PRAGMA foreign_keys = ON')`.
 - All 11 test files (`tests/*.test.ts` + `e2e-tests/**/*.test.ts`): import changed to `bun:sqlite`; `db.pragma()` → `db.exec('PRAGMA ...')`.
@@ -200,6 +201,7 @@ Implemented centralized logging utility and migrated tests to Vitest v4 compatib
   - Added `_resetRateLimit()` to `e2e-tests/recovery/recovery-pipeline.test.ts` to reduce state pollution.
 
 Test results:
+
 - `tests/`: 255 pass (unit tests)
 - `e2e-tests/`: 55 pass (e2e tests)
 - Note: State pollution issue remains when running both suites together (1 recovery test fails); run separately for now.
@@ -211,9 +213,36 @@ All 310 tests pass when run separately (21 test files).
 Fixed test failures in `tests/logger.test.ts` caused by mocking `globalThis.Date` with a non-constructor function, which triggered `TypeError: Reflect.construct requires the first argument be a constructor` when `new Date()` was called in the logger.
 
 Changes:
+
 - `src/utils/logger.ts`: Exported `_formatTimestamp` as a test helper function.
 - `tests/logger.test.ts`: Removed `globalThis.Date` mocking from all tests except the timestamp format test, which now uses `logger._formatTimestamp` directly. Other tests verify timestamp format with regex instead of checking for fixed timestamps.
 
 Test results:
+
 - `tests/`: 255 pass (all unit tests)
 - `e2e-tests/`: 55 pass (all e2e tests)
+
+## [2026-04-13] fix | Coverage Script Incompatibility with Bun
+
+Removed coverage configuration and script due to Bun not supporting Node.js inspector coverage APIs required by `@vitest/coverage-v8`.
+
+Root cause:
+
+- `@vitest/coverage-v8` uses Node.js inspector coverage APIs (`node:inspector`)
+- Bun does not support these inspector APIs
+- Attempted workaround: run coverage with Node.js instead of Bun
+- Workaround failed: tests use `bun:sqlite` which is Bun-specific and doesn't work with Node.js
+
+Changes:
+
+- `package.json`: Removed `@vitest/coverage-v8` dependency
+- `package.json`: Removed `test:coverage` script
+- `vitest.config.ts`: Removed coverage configuration
+
+Test results:
+
+- `tests/`: 255 pass
+- `e2e-tests/`: 55 pass
+- Total: 310 tests pass
+
+Note: Code coverage is not available with Bun runtime. If coverage is needed in the future, consider migrating tests to use a Node.js-compatible SQLite library (e.g., `better-sqlite3`) or wait for Bun to add inspector API support.

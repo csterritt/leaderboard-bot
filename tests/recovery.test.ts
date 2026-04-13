@@ -72,9 +72,9 @@ describe('recoverChannel', () => {
   it('begins from after=0 when last_processed_message_id is null (no prior state)', async () => {
     const capturedUrls: string[] = []
     global.fetch = vi.fn(async (url: string) => {
-        capturedUrls.push(String(url))
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      capturedUrls.push(String(url))
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     expect(capturedUrls[0]).toContain('after=0')
@@ -88,9 +88,9 @@ describe('recoverChannel', () => {
 
     const capturedUrls: string[] = []
     global.fetch = vi.fn(async (url: string) => {
-        capturedUrls.push(String(url))
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      capturedUrls.push(String(url))
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     expect(capturedUrls[0]).toContain('after=msg-checkpoint-99')
@@ -106,12 +106,12 @@ describe('recoverChannel', () => {
 
     let callCount = 0
     global.fetch = vi.fn(async () => {
-        callCount++
-        if (callCount === 1) {
-          return new Response(JSON.stringify(msgs), { status: 200 })
-        }
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callCount++
+      if (callCount === 1) {
+        return new Response(JSON.stringify(msgs), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
 
@@ -129,12 +129,12 @@ describe('recoverChannel', () => {
 
     let callCount = 0
     global.fetch = vi.fn(async () => {
-        callCount++
-        if (callCount === 1) {
-          return new Response(JSON.stringify(msgs), { status: 200 })
-        }
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callCount++
+      if (callCount === 1) {
+        return new Response(JSON.stringify(msgs), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -153,10 +153,10 @@ describe('recoverChannel', () => {
 
     let callCount = 0
     global.fetch = vi.fn(async () => {
-        callCount++
-        if (callCount === 1) return new Response(JSON.stringify([msg]), { status: 200 })
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callCount++
+      if (callCount === 1) return new Response(JSON.stringify([msg]), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -172,10 +172,10 @@ describe('recoverChannel', () => {
 
     let callCount = 0
     global.fetch = vi.fn(async () => {
-        callCount++
-        if (callCount === 1) return new Response(JSON.stringify(msgs), { status: 200 })
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callCount++
+      if (callCount === 1) return new Response(JSON.stringify(msgs), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -191,10 +191,10 @@ describe('recoverChannel', () => {
 
     let callCount = 0
     global.fetch = vi.fn(async () => {
-        callCount++
-        if (callCount === 1) return new Response(JSON.stringify(msgs), { status: 200 })
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callCount++
+      if (callCount === 1) return new Response(JSON.stringify(msgs), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     db.exec('DROP TABLE user_stats')
 
@@ -214,11 +214,11 @@ describe('recoverChannel', () => {
 
     let callCount = 0
     global.fetch = vi.fn(async (url: string) => {
-        callCount++
-        if (callCount === 1) return new Response(JSON.stringify(page1), { status: 200 })
-        if (callCount === 2) return new Response(JSON.stringify(page2), { status: 200 })
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callCount++
+      if (callCount === 1) return new Response(JSON.stringify(page1), { status: 200 })
+      if (callCount === 2) return new Response(JSON.stringify(page2), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(true)
@@ -233,11 +233,11 @@ describe('recoverChannel', () => {
     const capturedUrls: string[] = []
     let callCount = 0
     global.fetch = vi.fn(async (url: string) => {
-        capturedUrls.push(String(url))
-        callCount++
-        if (callCount === 1) return new Response(JSON.stringify(page1), { status: 200 })
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      capturedUrls.push(String(url))
+      callCount++
+      if (callCount === 1) return new Response(JSON.stringify(page1), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     expect(capturedUrls[1]).toContain('after=msg-page1')
@@ -245,8 +245,8 @@ describe('recoverChannel', () => {
 
   it('returns Result.err when fetchMessagesAfter fails', async () => {
     global.fetch = vi.fn(async () => {
-        return new Response('Server Error', { status: 500 })
-      }) as any
+      return new Response('Server Error', { status: 500 })
+    }) as any
 
     const result = await recoverChannel(db, TOKEN, MC_ID)
     expect(result.isOk).toBe(false)
@@ -285,9 +285,9 @@ describe('recoverAllChannels', () => {
 
     const capturedUrls: string[] = []
     global.fetch = vi.fn(async (url: string) => {
-        capturedUrls.push(String(url))
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      capturedUrls.push(String(url))
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     const result = await recoverAllChannels(db, TOKEN)
     expect(result.isOk).toBe(true)
@@ -361,10 +361,10 @@ describe('recoverChannel logging', () => {
 
     let callCount = 0
     global.fetch = vi.fn(async () => {
-        callCount++
-        if (callCount === 1) return new Response(JSON.stringify([msg]), { status: 200 })
-        return new Response(JSON.stringify([]), { status: 200 })
-      }) as any
+      callCount++
+      if (callCount === 1) return new Response(JSON.stringify([msg]), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
 
     await recoverChannel(db, TOKEN, MC_ID)
     expect(logSpy).toHaveBeenCalledWith(
