@@ -7,7 +7,7 @@ import {
   upsertUserStats,
   claimProcessedMessage,
 } from '../db/queries.js'
-import { hasMusicAttachment, computeNewStats, resolveUsername } from './tracker.js'
+import { hasMusicAttachment, hasYouTubeLink, computeNewStats, resolveUsername } from './tracker.js'
 import type { Database, NormalizedMessage, NormalizedAttachment, DiscordMessage } from '../types.js'
 import { logger } from '../utils/logger.js'
 
@@ -30,6 +30,7 @@ export const normalizeDiscordMessage = (raw: DiscordMessage): NormalizedMessage 
     contentType: a.content_type,
   })),
   type: raw.type,
+  content: raw.content,
 })
 
 interface GatewayAttachment {
@@ -57,6 +58,7 @@ interface GatewayMessage {
   createdTimestamp: number
   attachments: Map<string, GatewayAttachment>
   type: number
+  content?: string
 }
 
 export const normalizeGatewayMessage = (raw: GatewayMessage): NormalizedMessage => {
@@ -82,6 +84,7 @@ export const normalizeGatewayMessage = (raw: GatewayMessage): NormalizedMessage 
     timestamp: new Date(raw.createdTimestamp).toISOString(),
     attachments,
     type: raw.type,
+    content: raw.content,
   }
 }
 
@@ -101,7 +104,7 @@ export const processMessage = (
     )
     return Result.ok(false)
   }
-  if (!hasMusicAttachment(message.attachments)) {
+  if (!hasMusicAttachment(message.attachments) && !hasYouTubeLink(message.content)) {
     logger.log(`[processor] skipping message without music attachment: id=${message.id}`)
     return Result.ok(false)
   }

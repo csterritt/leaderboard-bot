@@ -14,7 +14,10 @@ Exercises the full message-processing pipeline from normalized message input thr
 - Bot-authored messages are ignored.
 - Non-music attachments are ignored.
 - Messages from non-monitored channels are ignored.
+- YouTube link messages (no attachment) count toward the streak.
 - The shared clock helper advances as expected for time-based scenarios.
+
+**12 tests, all passing.**
 
 ## Test approach
 

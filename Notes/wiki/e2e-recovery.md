@@ -12,6 +12,9 @@ Exercises the full recovery flow from Discord REST fetches through message norma
 - Mixed-user batches build independent stats per user.
 - `recoverAllChannels()` iterates every monitored channel.
 - Re-running recovery against the same data is idempotent.
+- YouTube link messages (no file attachment) are recovered and counted in stats.
+
+**9 tests, all passing.**
 
 ## Test approach
 

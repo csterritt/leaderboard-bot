@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeNewStats, hasMusicAttachment, resolveUsername } from '../src/services/tracker'
+import { computeNewStats, hasMusicAttachment, hasYouTubeLink, resolveUsername } from '../src/services/tracker'
 import type {
   UserStats,
   NormalizedAttachment,
@@ -164,8 +164,8 @@ describe('hasMusicAttachment', () => {
     expect(hasMusicAttachment([att(undefined, 'audio/mpeg')])).toBe(true)
   })
 
-  it('attachment with no filename and non-audio/non-image/non-pdf content_type returns false', () => {
-    expect(hasMusicAttachment([att(undefined, 'video/mp4')])).toBe(false)
+  it('attachment with no filename but video/mp4 content_type returns true', () => {
+    expect(hasMusicAttachment([att(undefined, 'video/mp4')])).toBe(true)
   })
 
   it('attachment with no filename and no content_type returns false', () => {
@@ -218,6 +218,45 @@ describe('hasMusicAttachment', () => {
   it('attachment with no filename but application/pdf content_type returns true', () => {
     expect(hasMusicAttachment([att(undefined, 'application/pdf')])).toBe(true)
   })
+
+  // Video file support
+  it('returns true for .mp4', () => {
+    expect(hasMusicAttachment([att('clip.mp4')])).toBe(true)
+  })
+
+  it('returns true for .webm', () => {
+    expect(hasMusicAttachment([att('video.webm')])).toBe(true)
+  })
+
+  it('returns true for .mov', () => {
+    expect(hasMusicAttachment([att('movie.mov')])).toBe(true)
+  })
+
+  it('returns true for .avi', () => {
+    expect(hasMusicAttachment([att('film.avi')])).toBe(true)
+  })
+
+  it('returns true for .mkv', () => {
+    expect(hasMusicAttachment([att('show.mkv')])).toBe(true)
+  })
+
+  it('returns true for .wmv', () => {
+    expect(hasMusicAttachment([att('media.wmv')])).toBe(true)
+  })
+
+  it('returns true for .flv', () => {
+    expect(hasMusicAttachment([att('stream.flv')])).toBe(true)
+  })
+
+  it('video extension matching is case-insensitive', () => {
+    expect(hasMusicAttachment([att('CLIP.MP4')])).toBe(true)
+    expect(hasMusicAttachment([att('VIDEO.WEBM')])).toBe(true)
+    expect(hasMusicAttachment([att('MOVIE.MOV')])).toBe(true)
+  })
+
+  it('attachment with no filename but video/ content_type returns true', () => {
+    expect(hasMusicAttachment([att(undefined, 'video/webm')])).toBe(true)
+  })
 })
 
 // ─── resolveUsername ─────────────────────────────────────────────────────────
@@ -250,5 +289,69 @@ describe('resolveUsername', () => {
 
   it('falls back to author.global_name when no member provided but globalName is set', () => {
     expect(resolveUsername(author('alice', 'Alice G'), undefined)).toBe('Alice G')
+  })
+})
+
+// ─── hasYouTubeLink ───────────────────────────────────────────────────────────
+
+describe('hasYouTubeLink', () => {
+  const VIDEO_ID = 'dQw4w9WgXcQ'
+
+  it('returns true for youtube.com/watch?v=...', () => {
+    expect(hasYouTubeLink(`https://www.youtube.com/watch?v=${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for youtu.be/...', () => {
+    expect(hasYouTubeLink(`https://youtu.be/${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for youtube.com/shorts/...', () => {
+    expect(hasYouTubeLink(`https://www.youtube.com/shorts/${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for youtube.com/live/...', () => {
+    expect(hasYouTubeLink(`https://www.youtube.com/live/${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for youtube.com/embed/...', () => {
+    expect(hasYouTubeLink(`https://www.youtube.com/embed/${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for youtube.com/v/...', () => {
+    expect(hasYouTubeLink(`https://www.youtube.com/v/${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for www.youtube.com/watch?v=...', () => {
+    expect(hasYouTubeLink(`https://www.youtube.com/watch?v=${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for m.youtube.com/watch?v=...', () => {
+    expect(hasYouTubeLink(`https://m.youtube.com/watch?v=${VIDEO_ID}`)).toBe(true)
+  })
+
+  it('returns true for URL with extra params (&t=14s)', () => {
+    expect(hasYouTubeLink(`https://www.youtube.com/watch?v=${VIDEO_ID}&t=14s`)).toBe(true)
+  })
+
+  it('returns true for URL with extra params (&list=...)', () => {
+    expect(
+      hasYouTubeLink(`https://www.youtube.com/watch?v=${VIDEO_ID}&list=PLtest1234567`),
+    ).toBe(true)
+  })
+
+  it('returns false for music.youtube.com/watch?v=...', () => {
+    expect(hasYouTubeLink(`https://music.youtube.com/watch?v=${VIDEO_ID}`)).toBe(false)
+  })
+
+  it('returns false for random text with no YouTube link', () => {
+    expect(hasYouTubeLink('check out this cool song!')).toBe(false)
+  })
+
+  it('returns false for undefined content', () => {
+    expect(hasYouTubeLink(undefined)).toBe(false)
+  })
+
+  it('returns false for empty string', () => {
+    expect(hasYouTubeLink('')).toBe(false)
   })
 })

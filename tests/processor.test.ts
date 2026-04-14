@@ -290,6 +290,102 @@ describe('processMessage', () => {
     expect(result.isOk).toBe(true)
     expect(result.value).toBe(true)
   })
+
+  it('processes a message with YouTube link in content but no attachment', () => {
+    const msg = makeMsg({
+      attachments: [],
+      content: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    })
+    const result = processMessage(db, msg)
+    expect(result.isOk).toBe(true)
+    expect(result.value).toBe(true)
+  })
+
+  it('processes a message with both YouTube link and attachment', () => {
+    const msg = makeMsg({
+      attachments: [{ filename: 'song.mp3' }],
+      content: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    })
+    const result = processMessage(db, msg)
+    expect(result.isOk).toBe(true)
+    expect(result.value).toBe(true)
+  })
+
+  it('does not process a message with music.youtube.com link and no attachment', () => {
+    const msg = makeMsg({
+      attachments: [],
+      content: 'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+    })
+    const result = processMessage(db, msg)
+    expect(result.isOk).toBe(true)
+    expect(result.value).toBe(false)
+  })
+})
+
+// ─── normalizeDiscordMessage content passthrough ───────────────────────────────
+
+describe('normalizeDiscordMessage content passthrough', () => {
+  it('maps content field when present', () => {
+    const raw: DiscordMessage = {
+      id: 'msg-content-1',
+      channel_id: 'ch-001',
+      author: { id: 'u1', username: 'alice', global_name: null },
+      timestamp: '2024-01-01T00:00:00.000Z',
+      attachments: [],
+      type: 0,
+      content: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    }
+    const msg = normalizeDiscordMessage(raw)
+    expect(msg.content).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+  })
+
+  it('leaves content undefined when absent', () => {
+    const raw: DiscordMessage = {
+      id: 'msg-content-2',
+      channel_id: 'ch-001',
+      author: { id: 'u1', username: 'alice', global_name: null },
+      timestamp: '2024-01-01T00:00:00.000Z',
+      attachments: [],
+      type: 0,
+    }
+    const msg = normalizeDiscordMessage(raw)
+    expect(msg.content).toBeUndefined()
+  })
+})
+
+// ─── normalizeGatewayMessage content passthrough ──────────────────────────────
+
+describe('normalizeGatewayMessage content passthrough', () => {
+  it('maps content field when present', () => {
+    const gatewayMsg = {
+      id: 'gw-content-1',
+      channelId: 'ch-gw-001',
+      guildId: 'guild-gw-001',
+      author: { id: 'ua', username: 'eve', globalName: 'Eve', bot: false },
+      member: null,
+      createdTimestamp: 1704067200000,
+      attachments: new Map(),
+      type: 0,
+      content: 'https://youtu.be/dQw4w9WgXcQ',
+    }
+    const msg = normalizeGatewayMessage(gatewayMsg)
+    expect(msg.content).toBe('https://youtu.be/dQw4w9WgXcQ')
+  })
+
+  it('leaves content undefined when absent', () => {
+    const gatewayMsg = {
+      id: 'gw-content-2',
+      channelId: 'ch-gw-002',
+      guildId: undefined,
+      author: { id: 'ub', username: 'frank', globalName: null, bot: false },
+      member: null,
+      createdTimestamp: 1704067200000,
+      attachments: new Map(),
+      type: 0,
+    }
+    const msg = normalizeGatewayMessage(gatewayMsg)
+    expect(msg.content).toBeUndefined()
+  })
 })
 
 // ─── processMessage logging ───────────────────────────────────────────────────

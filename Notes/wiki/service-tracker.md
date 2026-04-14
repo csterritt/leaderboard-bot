@@ -38,14 +38,28 @@ Returns `true` if any attachment qualifies as a music file, image file, or PDF f
 **Primary check:** `filename` (lowercased) ends with one of:
 - `MUSIC_EXTENSIONS` (`.mp3`, `.ogg`, `.wav`, `.flac`, `.m4a`, `.aac`)
 - `IMAGE_EXTENSIONS` (`.jpg`, `.jpeg`, `.png`, `.webp`)
+- `VIDEO_EXTENSIONS` (`.mp4`, `.webm`, `.mov`, `.avi`, `.mkv`, `.wmv`, `.flv`)
 - `PDF_EXTENSION` (`.pdf`)
 
 **Fallback:** if `filename` is absent, checks:
 - `contentType.startsWith('audio/')`
 - `contentType.startsWith('image/')`
+- `contentType.startsWith('video/')`
 - `contentType === 'application/pdf'`
 
 Returns `false` if the array is empty or no attachment matches.
+
+## hasYouTubeLink
+
+```typescript
+hasYouTubeLink(content: string | undefined): boolean
+```
+
+Returns `true` if `content` contains a YouTube video URL matching `YOUTUBE_URL_PATTERN`.
+
+**Matches:** `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/shorts/`, `youtube.com/live/`, `youtube.com/embed/`, `youtube.com/v/` with optional `www.` or `m.` subdomain. Optional `https://`. Extra query params (`&t=`, `&list=`, etc.) allowed.
+
+**Does NOT match:** `music.youtube.com` (any path). Returns `false` for `undefined` or empty string.
 
 ## resolveUsername
 
@@ -58,6 +72,6 @@ Priority: `member.nick` → `author.globalName` → `author.username`.
 ## Related pages
 
 - [util-time.md](util-time.md) — `computeStreakDelta` (used internally)
-- [constants.md](constants.md) — `MUSIC_EXTENSIONS`, `AUDIO_CONTENT_TYPE_PREFIX`
+- [constants.md](constants.md) — `MUSIC_EXTENSIONS`, `VIDEO_EXTENSIONS`, `AUDIO_CONTENT_TYPE_PREFIX`, `VIDEO_CONTENT_TYPE_PREFIX`, `YOUTUBE_URL_PATTERN`
 - [types.md](types.md) — `UserStats`, `UpsertUserStatsInput`, `NormalizedAttachment`, `NormalizedAuthor`, `NormalizedMember`
 - [tests-tracker.md](tests-tracker.md) — test coverage

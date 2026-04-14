@@ -5,6 +5,9 @@ import {
   PDF_EXTENSION,
   IMAGE_CONTENT_TYPE_PREFIX,
   PDF_CONTENT_TYPE,
+  VIDEO_EXTENSIONS,
+  VIDEO_CONTENT_TYPE_PREFIX,
+  YOUTUBE_URL_PATTERN,
 } from '../constants'
 import { computeStreakDelta } from '../utils/time'
 import type {
@@ -83,6 +86,7 @@ export const hasMusicAttachment = (attachments: readonly NormalizedAttachment[])
       if (
         (MUSIC_EXTENSIONS as readonly string[]).some((ext) => lower.endsWith(ext)) ||
         (IMAGE_EXTENSIONS as readonly string[]).some((ext) => lower.endsWith(ext)) ||
+        (VIDEO_EXTENSIONS as readonly string[]).some((ext) => lower.endsWith(ext)) ||
         lower.endsWith(PDF_EXTENSION)
       ) {
         return true
@@ -91,6 +95,7 @@ export const hasMusicAttachment = (attachments: readonly NormalizedAttachment[])
       if (
         att.contentType.startsWith(AUDIO_CONTENT_TYPE_PREFIX) ||
         att.contentType.startsWith(IMAGE_CONTENT_TYPE_PREFIX) ||
+        att.contentType.startsWith(VIDEO_CONTENT_TYPE_PREFIX) ||
         att.contentType === PDF_CONTENT_TYPE
       ) {
         return true
@@ -100,7 +105,14 @@ export const hasMusicAttachment = (attachments: readonly NormalizedAttachment[])
   return false
 }
 
-// ─── 3.3 resolveUsername ─────────────────────────────────────────────────────
+// ─── 3.3 hasYouTubeLink ──────────────────────────────────────────────────────
+
+export const hasYouTubeLink = (content: string | undefined): boolean => {
+  if (!content) return false
+  return YOUTUBE_URL_PATTERN.test(content)
+}
+
+// ─── 3.4 resolveUsername ─────────────────────────────────────────────────────
 
 export const resolveUsername = (
   author: NormalizedAuthor,

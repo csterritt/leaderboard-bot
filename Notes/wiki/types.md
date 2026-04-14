@@ -23,7 +23,7 @@
 | `DiscordUser`              | Discord user object (`id`, `username`, `global_name`, `bot?`)        |
 | `DiscordMember`            | Guild member object (`nick`, `permissions?`)                         |
 | `DiscordAttachment`        | Raw attachment from Discord API (`id`, `filename?`, `content_type?`) |
-| `DiscordMessage`           | Full Discord message object                                          |
+| `DiscordMessage`           | Full Discord message object; has optional `content?: string` field   |
 | `DiscordInteraction`       | Interaction payload from slash commands                              |
 | `DiscordInteractionData`   | Slash command name + options                                         |
 | `DiscordInteractionOption` | Single slash command option                                          |
@@ -35,7 +35,7 @@
 | `NormalizedAttachment` | `{ filename?, contentType? }` — normalized from `DiscordAttachment` |
 | `NormalizedAuthor`     | `{ id, username, globalName, isBot }`                               |
 | `NormalizedMember`     | `{ nick }`                                                          |
-| `NormalizedMessage`    | Internal message shape used by `processMessage`                     |
+| `NormalizedMessage`    | Internal message shape used by `processMessage`; has optional `content?: string` field |
 
 ## Other
 

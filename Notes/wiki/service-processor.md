@@ -8,7 +8,7 @@ Single authoritative message-ingestion pipeline used by both the gateway handler
 normalizeDiscordMessage(raw: DiscordMessage): NormalizedMessage
 ```
 
-Converts a raw Discord REST API `DiscordMessage` (snake_case fields) into the internal `NormalizedMessage` (camelCase). Maps `content_type` → `contentType` on attachments; maps `bot` → `isBot`; preserves optional `guild_id` and `member`.
+Converts a raw Discord REST API `DiscordMessage` (snake_case fields) into the internal `NormalizedMessage` (camelCase). Maps `content_type` → `contentType` on attachments; maps `bot` → `isBot`; preserves optional `guild_id`, `member`, and `content`.
 
 ## normalizeGatewayMessage
 
@@ -16,7 +16,7 @@ Converts a raw Discord REST API `DiscordMessage` (snake_case fields) into the in
 normalizeGatewayMessage(raw: GatewayMessage): NormalizedMessage
 ```
 
-Converts a `discord.js` gateway message object (which uses Maps, camelCase, and `createdTimestamp` instead of `timestamp`) into `NormalizedMessage`. `createdTimestamp` (ms epoch) → `new Date(ts).toISOString()`. Attachment Map → `NormalizedAttachment[]`. `member.nickname` → `nick`. Optional fields (`guildId`, `member`) handled safely.
+Converts a `discord.js` gateway message object (which uses Maps, camelCase, and `createdTimestamp` instead of `timestamp`) into `NormalizedMessage`. `createdTimestamp` (ms epoch) → `new Date(ts).toISOString()`. Attachment Map → `NormalizedAttachment[]`. `member.nickname` → `nick`. Optional fields (`guildId`, `member`, `content`) handled safely.
 
 ## processMessage
 
@@ -29,12 +29,12 @@ Single transactional message-processing path.
 **Returns:**
 
 - `Result.ok(true)` — message was processed and stats updated.
-- `Result.ok(false)` — message was filtered/skipped (bot, wrong type, no music attachment, non-monitored channel, already claimed).
+- `Result.ok(false)` — message was filtered/skipped (bot, wrong type, no music attachment and no YouTube link, non-monitored channel, already claimed).
 - `Result.err` — DB failure; transaction was rolled back so no partial state remains.
 
 **Algorithm:**
 
-1. Early-exit filters (bot, message type, no music attachment) — no DB touch.
+1. Early-exit filters (bot, message type, no music attachment AND no YouTube link in `content`) — no DB touch.
 2. `isMonitoredChannel(db, channelId)` — skip if not monitored.
 3. Open SQLite transaction:
    a. `claimProcessedMessage` — idempotency guard (returns `false` → skip, already claimed).
@@ -58,7 +58,7 @@ Single transactional message-processing path.
 
 ## Related pages
 
-- [service-tracker.md](service-tracker.md) — `hasMusicAttachment`, `computeNewStats`, `resolveUsername`
+- [service-tracker.md](service-tracker.md) — `hasMusicAttachment`, `hasYouTubeLink`, `computeNewStats`, `resolveUsername`
 - [db-queries.md](db-queries.md) — `isMonitoredChannel`, `claimProcessedMessage`, `getUserStats`, `upsertUserStats`
 - [util-time.md](util-time.md) — `parseDiscordTimestamp`
 - [types.md](types.md) — `NormalizedMessage`, `DiscordMessage`, `Database`

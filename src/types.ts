@@ -99,6 +99,7 @@ export interface NormalizedMessage {
   readonly timestamp: string
   readonly attachments: readonly NormalizedAttachment[]
   readonly type: number
+  readonly content?: string
 }
 
 export interface DiscordMessage {
@@ -110,6 +111,7 @@ export interface DiscordMessage {
   readonly timestamp: string
   readonly attachments: readonly DiscordAttachment[]
   readonly type: number
+  readonly content?: string
 }
 
 export interface DiscordInteraction {

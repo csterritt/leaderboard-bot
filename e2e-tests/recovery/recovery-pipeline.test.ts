@@ -65,6 +65,7 @@ function makeDiscordMessage(
     timestamp: new Date(timestampSecs * 1000).toISOString(),
     attachments: [{ id: `att-${id}`, filename: 'track.mp3' }],
     type: 0,
+    content: undefined,
     ...overrides,
   }
 }
@@ -300,6 +301,35 @@ describe('recovery pipeline (e2e)', () => {
     const mc2State = getRecoveryState(db, MC2)
     expect(mc1State.value?.lastProcessedMessageId).toBe(`msg-${MC_ID}`)
     expect(mc2State.value?.lastProcessedMessageId).toBe(`msg-${MC2}`)
+  })
+
+  it('recovers a YouTube link message and includes it in stats', async () => {
+    const t0 = clock.now()
+    const messages: DiscordMessage[] = [
+      makeDiscordMessage('msg-yt-1', 'heidi', t0),
+      makeDiscordMessage('msg-yt-2', 'heidi', t0 + 12 * 3600, {
+        attachments: [],
+        content: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      }),
+    ]
+
+    let call = 0
+    global.fetch = vi.fn(async () => {
+      call++
+      return call === 1
+        ? new Response(JSON.stringify(messages), { status: 200 })
+        : new Response(JSON.stringify([]), { status: 200 })
+    }) as any
+
+    const result = await recoverChannel(db, TOKEN, MC_ID)
+    expect(result.isOk).toBe(true)
+    expect(result.value).toBe(2)
+
+    const stats = getUserStats(db, MC_ID, 'heidi')
+    expect(stats.value?.runCount).toBe(2)
+
+    const checkpoint = getRecoveryState(db, MC_ID)
+    expect(checkpoint.value?.lastProcessedMessageId).toBe('msg-yt-2')
   })
 
   it('recovery is idempotent: running twice on the same data produces the same result', async () => {

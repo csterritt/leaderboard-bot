@@ -245,6 +245,24 @@ describe('streak accumulation (e2e)', () => {
     expect(result.value).toBe(false)
   })
 
+  it('YouTube link message counts toward streak', () => {
+    const t0 = clock.now()
+    processMessage(db, makeMsg({ id: 'msg-1', timestampSecs: t0 }))
+
+    clock.advance(12 * 3600)
+    const youtubeMsg = makeMsg({
+      id: 'msg-yt',
+      timestampSecs: clock.now(),
+      attachments: [],
+      content: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    })
+    processMessage(db, youtubeMsg)
+
+    const stats = getUserStats(db, MC_ID, USER_A)
+    expect(stats.value?.runCount).toBe(2)
+    expect(stats.value?.highestRunSeen).toBe(2)
+  })
+
   it('hasPassed correctly used for scheduling — clock advances correctly', () => {
     const nextHour = clock.now() + 3600
     expect(clock.hasPassed(nextHour)).toBe(false)
