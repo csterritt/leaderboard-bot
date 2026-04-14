@@ -1,7 +1,1 @@
-Please figure out why running:
-
-    bun run test:coverage
-
-fails with:
-
-    Error: Coverage APIs are not supported
+Right now, the program only considers audio files. please set it up so that it can also consider image files, and PDFs.

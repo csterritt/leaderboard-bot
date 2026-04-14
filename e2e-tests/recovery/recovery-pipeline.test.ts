@@ -210,8 +210,8 @@ describe('recovery pipeline (e2e)', () => {
     const t0 = clock.now()
     const messages: DiscordMessage[] = [
       makeDiscordMessage('msg-music', 'eve', t0),
-      makeDiscordMessage('msg-image', 'eve', t0 + 12 * 3600, {
-        attachments: [{ id: 'img-att', filename: 'photo.png' }],
+      makeDiscordMessage('msg-non-music', 'eve', t0 + 12 * 3600, {
+        attachments: [{ id: 'txt-att', filename: 'document.txt' }],
       }),
       makeDiscordMessage('msg-music-2', 'eve', t0 + 24 * 3600),
     ]
@@ -231,8 +231,8 @@ describe('recovery pipeline (e2e)', () => {
     const stats = getUserStats(db, MC_ID, 'eve')
     expect(stats.value?.runCount).toBe(2)
 
-    const imageClaimed = hasProcessedMessage(db, 'msg-image')
-    expect(imageClaimed.value).toBe(false)
+    const nonMusicClaimed = hasProcessedMessage(db, 'msg-non-music')
+    expect(nonMusicClaimed.value).toBe(false)
   })
 
   it('builds stats for multiple users from a mixed recovery batch', async () => {

@@ -5,7 +5,11 @@
 | Constant                          | Value                                               | Purpose                                        |
 | --------------------------------- | --------------------------------------------------- | ---------------------------------------------- |
 | `MUSIC_EXTENSIONS`                | `['.mp3', '.ogg', '.wav', '.flac', '.m4a', '.aac']` | Accepted audio file extensions                 |
+| `IMAGE_EXTENSIONS`                | `['.jpg', '.jpeg', '.png', '.webp']`                | Accepted image file extensions                 |
+| `PDF_EXTENSION`                   | `'.pdf'`                                            | Accepted PDF file extension                    |
 | `AUDIO_CONTENT_TYPE_PREFIX`       | `'audio/'`                                          | Fallback MIME type check when filename absent  |
+| `IMAGE_CONTENT_TYPE_PREFIX`       | `'image/'`                                          | Fallback MIME type check for images            |
+| `PDF_CONTENT_TYPE`                | `'application/pdf'`                                 | Fallback MIME type check for PDFs             |
 | `EIGHT_HOURS_SECS`                | `28_800`                                            | Upper bound for "noop" streak delta            |
 | `THIRTY_SIX_HOURS_SECS`           | `129_600`                                           | Upper bound for "increment" streak delta       |
 | `LEADERBOARD_MAX_ROWS`            | `50`                                                | Max rows returned in leaderboard query         |
@@ -21,3 +25,4 @@
 - [util-db-helpers.md](util-db-helpers.md) — uses `STANDARD_RETRY_OPTIONS`, `SQLITE_TRANSIENT_ERROR_MESSAGES`
 - [util-time.md](util-time.md) — uses `EIGHT_HOURS_SECS`, `THIRTY_SIX_HOURS_SECS`
 - [util-permissions.md](util-permissions.md) — uses `ADMINISTRATOR_PERMISSION`
+- [service-tracker.md](service-tracker.md) — uses `MUSIC_EXTENSIONS`, `IMAGE_EXTENSIONS`, `PDF_EXTENSION`, `AUDIO_CONTENT_TYPE_PREFIX`, `IMAGE_CONTENT_TYPE_PREFIX`, `PDF_CONTENT_TYPE`

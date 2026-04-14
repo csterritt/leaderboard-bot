@@ -14,13 +14,19 @@ Tests for `src/services/tracker.ts`. No database — all tests are pure unit tes
 
 ## hasMusicAttachment coverage
 
-- All six extensions: `.mp3`, `.ogg`, `.wav`, `.flac`, `.m4a`, `.aac`.
-- Case-insensitive matching (`SONG.MP3`, `TRACK.OGG`).
+- All six audio extensions: `.mp3`, `.ogg`, `.wav`, `.flac`, `.m4a`, `.aac`.
+- All four image extensions: `.jpg`, `.jpeg`, `.png`, `.webp`.
+- PDF extension: `.pdf`.
+- Case-insensitive matching for all types (`SONG.MP3`, `PHOTO.JPG`, `DOCUMENT.PDF`).
 - `song.mp3.txt` rejected (extension must be the last part).
-- Non-audio filenames return `false`.
+- Non-audio/non-image/non-pdf filenames return `false`.
 - Empty attachments array returns `false`.
 - No filename, `audio/mpeg` content type → `true`.
-- No filename, `image/png` content type → `false`.
+- No filename, `image/jpeg` content type → `true`.
+- No filename, `image/png` content type → `true`.
+- No filename, `image/webp` content type → `true`.
+- No filename, `application/pdf` content type → `true`.
+- No filename, non-audio/non-image/non-pdf content type (e.g., `video/mp4`) → `false`.
 - No filename, no content type → `false`.
 
 ## resolveUsername coverage
@@ -30,7 +36,7 @@ Tests for `src/services/tracker.ts`. No database — all tests are pure unit tes
 - Falls back to `author.username`.
 - Works without a `member` argument (both fallback cases).
 
-**25 tests, all passing.**
+**36 tests, all passing.**
 
 ## Related pages
 

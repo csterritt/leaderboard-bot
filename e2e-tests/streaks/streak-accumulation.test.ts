@@ -215,13 +215,13 @@ describe('streak accumulation (e2e)', () => {
 
   it('non-music attachments are ignored', () => {
     const t0 = clock.now()
-    const imgMsg = makeMsg({
-      id: 'msg-img',
+    const txtMsg = makeMsg({
+      id: 'msg-txt',
       timestampSecs: t0,
-      attachments: [{ filename: 'photo.jpg' }],
+      attachments: [{ filename: 'document.txt' }],
     })
 
-    const result = processMessage(db, imgMsg)
+    const result = processMessage(db, txtMsg)
     expect(result.value).toBe(false)
 
     const stats = getUserStats(db, MC_ID, USER_A)

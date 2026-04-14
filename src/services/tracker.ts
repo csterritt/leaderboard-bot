@@ -1,4 +1,11 @@
-import { MUSIC_EXTENSIONS, AUDIO_CONTENT_TYPE_PREFIX } from '../constants'
+import {
+  MUSIC_EXTENSIONS,
+  AUDIO_CONTENT_TYPE_PREFIX,
+  IMAGE_EXTENSIONS,
+  PDF_EXTENSION,
+  IMAGE_CONTENT_TYPE_PREFIX,
+  PDF_CONTENT_TYPE,
+} from '../constants'
 import { computeStreakDelta } from '../utils/time'
 import type {
   UserStats,
@@ -73,11 +80,19 @@ export const hasMusicAttachment = (attachments: readonly NormalizedAttachment[])
   for (const att of attachments) {
     if (att.filename) {
       const lower = att.filename.toLowerCase()
-      if ((MUSIC_EXTENSIONS as readonly string[]).some((ext) => lower.endsWith(ext))) {
+      if (
+        (MUSIC_EXTENSIONS as readonly string[]).some((ext) => lower.endsWith(ext)) ||
+        (IMAGE_EXTENSIONS as readonly string[]).some((ext) => lower.endsWith(ext)) ||
+        lower.endsWith(PDF_EXTENSION)
+      ) {
         return true
       }
     } else if (att.contentType) {
-      if (att.contentType.startsWith(AUDIO_CONTENT_TYPE_PREFIX)) {
+      if (
+        att.contentType.startsWith(AUDIO_CONTENT_TYPE_PREFIX) ||
+        att.contentType.startsWith(IMAGE_CONTENT_TYPE_PREFIX) ||
+        att.contentType === PDF_CONTENT_TYPE
+      ) {
         return true
       }
     }

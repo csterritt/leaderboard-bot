@@ -33,10 +33,18 @@ Computes the updated `UserStats` for a user after a new music post arrives.
 hasMusicAttachment(attachments: readonly NormalizedAttachment[]): boolean
 ```
 
-Returns `true` if any attachment qualifies as a music file.
+Returns `true` if any attachment qualifies as a music file, image file, or PDF file.
 
-**Primary check:** `filename` (lowercased) ends with one of `MUSIC_EXTENSIONS` (`.mp3`, `.ogg`, `.wav`, `.flac`, `.m4a`, `.aac`).  
-**Fallback:** if `filename` is absent, checks `contentType.startsWith('audio/')`.  
+**Primary check:** `filename` (lowercased) ends with one of:
+- `MUSIC_EXTENSIONS` (`.mp3`, `.ogg`, `.wav`, `.flac`, `.m4a`, `.aac`)
+- `IMAGE_EXTENSIONS` (`.jpg`, `.jpeg`, `.png`, `.webp`)
+- `PDF_EXTENSION` (`.pdf`)
+
+**Fallback:** if `filename` is absent, checks:
+- `contentType.startsWith('audio/')`
+- `contentType.startsWith('image/')`
+- `contentType === 'application/pdf'`
+
 Returns `false` if the array is empty or no attachment matches.
 
 ## resolveUsername

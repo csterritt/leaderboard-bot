@@ -1,6 +1,14 @@
 export const MUSIC_EXTENSIONS = ['.mp3', '.ogg', '.wav', '.flac', '.m4a', '.aac'] as const
 
+export const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const
+
+export const PDF_EXTENSION = '.pdf' as const
+
 export const AUDIO_CONTENT_TYPE_PREFIX = 'audio/' as const
+
+export const IMAGE_CONTENT_TYPE_PREFIX = 'image/' as const
+
+export const PDF_CONTENT_TYPE = 'application/pdf' as const
 
 export const EIGHT_HOURS_SECS = 28_800
 export const THIRTY_SIX_HOURS_SECS = 129_600

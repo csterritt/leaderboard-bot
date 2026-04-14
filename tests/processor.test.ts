@@ -203,7 +203,7 @@ describe('processMessage', () => {
   })
 
   it('ignores a message with no supported music attachment', () => {
-    const msg = makeMsg({ attachments: [{ filename: 'image.png' }] })
+    const msg = makeMsg({ attachments: [{ filename: 'document.txt' }] })
     const result = processMessage(db, msg)
     expect(result.isOk).toBe(true)
     expect(result.value).toBe(false)
@@ -320,7 +320,7 @@ describe('processMessage logging', () => {
 
   it('logs when skipping message without music attachment', () => {
     const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => {})
-    const msg = makeMsg({ attachments: [{ filename: 'photo.png' }] })
+    const msg = makeMsg({ attachments: [{ filename: 'document.txt' }] })
     processMessage(db, msg)
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('[processor] skipping message without music attachment'),

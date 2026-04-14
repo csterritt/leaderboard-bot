@@ -152,8 +152,8 @@ describe('hasMusicAttachment', () => {
     expect(hasMusicAttachment([att('song.mp3.txt')])).toBe(false)
   })
 
-  it('non-audio attachments return false', () => {
-    expect(hasMusicAttachment([att('photo.jpg')])).toBe(false)
+  it('non-audio/non-image/non-pdf attachments return false', () => {
+    expect(hasMusicAttachment([att('document.txt')])).toBe(false)
   })
 
   it('no attachments returns false', () => {
@@ -164,12 +164,59 @@ describe('hasMusicAttachment', () => {
     expect(hasMusicAttachment([att(undefined, 'audio/mpeg')])).toBe(true)
   })
 
-  it('attachment with no filename and non-audio content_type returns false', () => {
-    expect(hasMusicAttachment([att(undefined, 'image/png')])).toBe(false)
+  it('attachment with no filename and non-audio/non-image/non-pdf content_type returns false', () => {
+    expect(hasMusicAttachment([att(undefined, 'video/mp4')])).toBe(false)
   })
 
   it('attachment with no filename and no content_type returns false', () => {
     expect(hasMusicAttachment([att(undefined, undefined)])).toBe(false)
+  })
+
+  // New tests for image and PDF support
+  it('returns true for .jpg', () => {
+    expect(hasMusicAttachment([att('photo.jpg')])).toBe(true)
+  })
+
+  it('returns true for .jpeg', () => {
+    expect(hasMusicAttachment([att('image.jpeg')])).toBe(true)
+  })
+
+  it('returns true for .png', () => {
+    expect(hasMusicAttachment([att('graphic.png')])).toBe(true)
+  })
+
+  it('returns true for .webp', () => {
+    expect(hasMusicAttachment([att('picture.webp')])).toBe(true)
+  })
+
+  it('returns true for .pdf', () => {
+    expect(hasMusicAttachment([att('document.pdf')])).toBe(true)
+  })
+
+  it('image extension matching is case-insensitive', () => {
+    expect(hasMusicAttachment([att('PHOTO.JPG')])).toBe(true)
+    expect(hasMusicAttachment([att('IMAGE.PNG')])).toBe(true)
+    expect(hasMusicAttachment([att('PICTURE.WEBP')])).toBe(true)
+  })
+
+  it('PDF extension matching is case-insensitive', () => {
+    expect(hasMusicAttachment([att('DOCUMENT.PDF')])).toBe(true)
+  })
+
+  it('attachment with no filename but image/jpeg content_type returns true', () => {
+    expect(hasMusicAttachment([att(undefined, 'image/jpeg')])).toBe(true)
+  })
+
+  it('attachment with no filename but image/png content_type returns true', () => {
+    expect(hasMusicAttachment([att(undefined, 'image/png')])).toBe(true)
+  })
+
+  it('attachment with no filename but image/webp content_type returns true', () => {
+    expect(hasMusicAttachment([att(undefined, 'image/webp')])).toBe(true)
+  })
+
+  it('attachment with no filename but application/pdf content_type returns true', () => {
+    expect(hasMusicAttachment([att(undefined, 'application/pdf')])).toBe(true)
   })
 })
 
