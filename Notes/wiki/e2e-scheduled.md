@@ -12,6 +12,7 @@ Exercises the full scheduled-work pipeline: recovery, leaderboard rendering/post
 - Runs recovery before posting so newly recovered messages affect the leaderboard.
 - Removes a stored leaderboard post when its leaderboard channel no longer has a monitored-channel link.
 - Prunes old `processed_messages` rows during the scheduled run.
+- **Startup scenario**: recovery backfills messages in a single `runScheduledWork` pass and the leaderboard is posted immediately (not deferred to the next hourly tick).
 
 ## Test approach
 

@@ -1,104 +1,41 @@
-# Plan: Add video file attachment and YouTube link support
+# Plan: Post/refresh leaderboard after recovery pass finishes
 
-## Assumptions
+## Problem
 
-- No database schema changes needed
-- Video attachments and YouTube links contribute to the same streak as audio, image, and PDF files
-- No terminology changes — the function is still called `hasMusicAttachment`
-- `music.youtube.com` links should NOT count
-- YouTube link detection requires adding a `content` field to message types (not a DB schema change)
+When a recovery pass finishes, the leaderboard should be posted (if missing) or updated (if stale). Currently this only happens in the **hourly scheduled work** pipeline (`runScheduledWork`), which already runs recovery → leaderboard refresh → prune in sequence. However, the **startup recovery pass** in `src/index.ts` calls `recoverAllChannels` directly and does *not* refresh leaderboards afterward. This means:
 
-## Scope
+- If the bot restarts and recovery backfills new messages, the leaderboard won't reflect them until the next hourly tick (up to 1 hour delay).
+- If no leaderboard has ever been posted, it won't appear until the first hourly tick.
 
-Two separate features:
+## Analysis
 
-1. **Video file attachments** — detect by extension and content-type fallback, same pattern as existing audio/image/PDF checks
-2. **YouTube link detection** — detect YouTube URLs in message text content; requires threading `content` through the normalization and type system
+The leaderboard refresh logic already exists in `runScheduledWork` (lines 37–89 of `src/handlers/scheduled.ts`). Two options:
 
-## Video extensions to support
+**Option A — Replace the startup `recoverAllChannels` call with `runScheduledWork`.** This is the simplest fix: `runScheduledWork` already runs recovery first, then refreshes leaderboards, then prunes. It's a direct drop-in replacement for the startup recovery call. The only behavioral addition is that it also prunes old processed messages at startup, which is benign.
 
-Common on Discord: `.mp4`, `.webm`, `.mov`
-Less common: `.avi`, `.mkv`, `.wmv`, `.flv`
+**Option B — Extract the leaderboard refresh loop into a standalone function and call it after startup recovery.** More surgical, avoids the pruning side-effect at startup, but adds code and a new function surface.
 
-Content-type fallback: `video/` prefix
-
-## YouTube URL patterns to match
-
-All of these with optional `http://` or `https://`, optional `www.` or `m.` subdomain:
-
-- `youtube.com/watch?v=VIDEO_ID`
-- `youtu.be/VIDEO_ID`
-- `youtube.com/shorts/VIDEO_ID`
-- `youtube.com/live/VIDEO_ID`
-- `youtube.com/embed/VIDEO_ID`
-- `youtube.com/v/VIDEO_ID`
-
-Explicitly excluded: `music.youtube.com` (any path)
-
-YouTube video IDs are 11 characters: `[A-Za-z0-9_-]{11}`
-
-URLs may have additional query params (`&t=`, `&list=`, etc.) that should not prevent matching.
-
-## Pitfalls
-
-- **`NormalizedMessage` needs a `content` field** — currently absent. Must add to `NormalizedMessage`, `DiscordMessage`, and `GatewayMessage` (in processor.ts). Must thread through both normalization functions.
-- **Existing tests create `NormalizedMessage` objects without `content`** — the field should be optional (`content?: string`) to avoid breaking all existing test fixtures.
-- **`processMessage` currently only checks `hasMusicAttachment(message.attachments)`** — needs to also check for YouTube links in `message.content`.
-- **The `video/mp4` content-type test** in `tests/tracker.test.ts` currently expects `false` — needs updating.
-- **The e2e recovery test** `makeDiscordMessage` helper builds `DiscordMessage` objects — needs `content` field added.
-- **Regex must not match `music.youtube.com`** — the pattern should explicitly exclude it.
+**Recommendation:** Option A. It's minimal, uses existing tested code, and the pruning side-effect is harmless (even beneficial after a restart). The startup log messages will change slightly (`[scheduled] ...` instead of `[startup] recovery ...`), so we should adjust the startup logging.
 
 ## Tasks
 
-### Part A: Video file attachments
+- [x] **1. Extract or reuse leaderboard refresh logic:** In `src/index.ts`, replace the bare `recoverAllChannels(db, token)` call with `runScheduledWork(db, token)`. Update the surrounding log messages to reflect that this is a startup scheduled work pass.
+- [x] **2. Plan unit tests:** Add/modify tests to cover the new startup behavior:
+  - Unit test: confirm `runScheduledWork` posts a leaderboard when none exists after recovery finds new messages (already covered by existing test "runs recovery before leaderboard posting").
+  - Unit test: confirm `runScheduledWork` deletes and re-posts when content has changed (already covered by existing test "deletes the previous leaderboard message when one exists before posting new").
+  - E2E test: add a test that simulates the startup scenario — recovery backfills messages, then verifies the leaderboard is posted immediately (not deferred to the hourly tick).
+- [x] **3. Implement the change** (Red/Green TDD per instructions).
+- [x] **4. Run all tests** (`tests/` and `e2e-tests/`) and confirm they pass.
+- [x] **5. Update wiki** to reflect the changed startup behavior.
 
-- [x] 1. Add `VIDEO_EXTENSIONS` and `VIDEO_CONTENT_TYPE_PREFIX` to `src/constants.ts`
-- [x] 2. Write failing tests in `tests/tracker.test.ts` for video extension detection (`.mp4`, `.webm`, `.mov`, `.avi`, `.mkv`, `.wmv`, `.flv`), case-insensitive matching, and `video/` content-type fallback
-- [x] 3. Update existing test that expects `video/mp4` content type → `false` (now should be `true`)
-- [x] 4. Update `hasMusicAttachment` in `src/services/tracker.ts` to check `VIDEO_EXTENSIONS` and `VIDEO_CONTENT_TYPE_PREFIX`
-- [x] 5. Run `tests/tracker.test.ts` — all green
+## Pitfalls
 
-### Part B: YouTube link detection (types + plumbing)
+- **Double recovery on first hourly tick:** After the change, recovery runs at startup (via `runScheduledWork`) and again ~1 hour later (via the hourly interval). This is already the current behavior since recovery is idempotent via checkpoints — no new messages will be processed on the second run.
+- **Startup timing:** `runScheduledWork` is async and fire-and-forget at startup. If it fails, the error is already logged. No change in error handling posture.
+- **Log clarity:** The startup recovery logs will now show `[scheduled]` prefixes instead of `[startup]`. We should add a `[startup]` log line before calling `runScheduledWork` so it's clear this is the startup pass.
 
-- [x] 6. Add `content?: string` to `NormalizedMessage` in `src/types.ts`
-- [x] 7. Add `content?: string` to `DiscordMessage` in `src/types.ts`
-- [x] 8. Update `normalizeDiscordMessage` in `src/services/processor.ts` to map `content`
-- [x] 9. Update `GatewayMessage` interface and `normalizeGatewayMessage` in `src/services/processor.ts` to map `content`
-- [x] 10. Add `YOUTUBE_URL_PATTERN` regex constant to `src/constants.ts`
-- [x] 11. Add `hasYouTubeLink(content: string | undefined): boolean` to `src/services/tracker.ts`
-- [x] 12. Write failing tests for `hasYouTubeLink` in `tests/tracker.test.ts`:
-    - `youtube.com/watch?v=...` → true
-    - `youtu.be/...` → true
-    - `youtube.com/shorts/...` → true
-    - `youtube.com/live/...` → true
-    - `youtube.com/embed/...` → true
-    - `youtube.com/v/...` → true
-    - `www.youtube.com/watch?v=...` → true
-    - `m.youtube.com/watch?v=...` → true
-    - URL with extra params (`&t=14s`, `&list=...`) → true
-    - `music.youtube.com/watch?v=...` → false
-    - Random text with no YouTube link → false
-    - `undefined` content → false
-    - Empty string → false
-- [x] 13. Implement `hasYouTubeLink` — all tests green
+## Assumptions
 
-### Part C: Wire YouTube detection into processMessage
-
-- [x] 14. Update `processMessage` in `src/services/processor.ts` — check `hasMusicAttachment(message.attachments) || hasYouTubeLink(message.content)` instead of just `hasMusicAttachment`
-- [x] 15. Write/update tests in `tests/processor.test.ts`:
-    - Message with YouTube link in content but no attachment → processed
-    - Message with YouTube link + attachment → processed
-    - Message with `music.youtube.com` link and no attachment → not processed
-    - Update `normalizeDiscordMessage` and `normalizeGatewayMessage` tests to verify `content` passthrough
-- [x] 16. Run `tests/processor.test.ts` — all green
-
-### Part D: Update e2e tests
-
-- [x] 17. Update `e2e-tests/streaks/streak-accumulation.test.ts` — add test for YouTube link message counting toward streak
-- [x] 18. Update `e2e-tests/recovery/recovery-pipeline.test.ts` — add `content` to `DiscordMessage` in `makeDiscordMessage`, verify YouTube link messages are recovered
-
-### Part E: Full test suite + wiki + notify
-
-- [x] 19. Run full test suite (`bun --bun vitest run`) — all green
-- [x] 20. Update wiki pages: `constants.md`, `service-tracker.md`, `service-processor.md`, `tests-tracker.md`, `tests-processor.md`, `types.md`, `e2e-streaks.md`, `e2e-recovery.md`
-- [x] 21. Notify completion via `/home/chris/notify-app`
+- The "recovery pass" in file `2-Actual-Work.md` refers to both the startup recovery and the hourly scheduled recovery. The hourly path already handles this correctly; the startup path is the gap.
+- No database schema changes are needed.
+- The existing content-hash deduplication in `runScheduledWork` is sufficient to determine "out of date" — if the formatted leaderboard content differs from the stored hash, it's out of date.

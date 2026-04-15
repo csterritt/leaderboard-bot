@@ -11,11 +11,11 @@ Integration tests for the startup wiring and the gateway-to-database path.
 - Emits a `messageCreate` event with a valid music attachment.
 - Verifies `getUserStats` returns a persisted row with `runCount = 1`.
 
-### Startup recovery ordering (1 test)
+### Startup scheduled work ordering (1 test)
 
-- Verifies recovery is performed immediately at startup rather than being deferred until the first hourly interval tick.
+- Verifies `runScheduledWork` is performed immediately at startup rather than being deferred until the first hourly interval tick.
 - Uses a stubbed `fetch` and a fake `setInterval` to record call ordering.
-- Confirms recovery completes before interval registration is observed.
+- Confirms the startup scheduled work pass completes before interval registration is observed.
 
 ## Test approach
 
@@ -27,4 +27,4 @@ Integration tests for the startup wiring and the gateway-to-database path.
 
 - [entry-point.md](entry-point.md) — startup sequence under test
 - [handler-gateway.md](handler-gateway.md) — gateway listener wiring
-- [service-recovery.md](service-recovery.md) — startup recovery behavior
+- [handler-scheduled.md](handler-scheduled.md) — `runScheduledWork` used at startup

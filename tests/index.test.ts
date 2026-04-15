@@ -5,7 +5,7 @@ import { join } from 'path'
 import { EventEmitter } from 'events'
 import { setupGatewayHandler } from '../src/handlers/gateway'
 import { addMonitoredChannel, upsertLeaderboardChannel, getUserStats } from '../src/db/queries'
-import { recoverAllChannels } from '../src/services/recovery'
+import { runScheduledWork } from '../src/handlers/scheduled'
 import type { Database as DatabaseType } from '../src/types'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf8')
@@ -76,9 +76,9 @@ describe('integration: gateway messageCreate creates a DB row', () => {
   })
 })
 
-// ─── 11.9 — Startup integration: recovery runs before first interval ─────────
+// ─── 11.9 — Startup integration: scheduled work runs before first interval ──────
 
-describe('integration: recovery pass runs at startup before any scheduled interval', () => {
+describe('integration: startup scheduled work pass runs before any scheduled interval', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
@@ -87,11 +87,11 @@ describe('integration: recovery pass runs at startup before any scheduled interv
     vi.restoreAllMocks()
   })
 
-  it('recovery is invoked immediately at startup, not deferred to the first interval tick', async () => {
+  it('runScheduledWork is invoked immediately at startup, not deferred to the first interval tick', async () => {
     const callOrder: string[] = []
 
     global.fetch = vi.fn(async () => {
-      callOrder.push('recovery-fetch')
+      callOrder.push('scheduled-fetch')
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
@@ -107,14 +107,14 @@ describe('integration: recovery pass runs at startup before any scheduled interv
     globalThis.setInterval = fakeSetInterval as never
 
     try {
-      await recoverAllChannels(db, TOKEN)
-      callOrder.push('recovery-complete')
+      await runScheduledWork(db, TOKEN)
+      callOrder.push('startup-scheduled-complete')
       fakeSetInterval(() => {}, 3_600_000)
 
-      const recoveryIdx = callOrder.findIndex((e) => e === 'recovery-complete')
+      const scheduledIdx = callOrder.findIndex((e) => e === 'startup-scheduled-complete')
       const intervalIdx = callOrder.findIndex((e) => e === 'setInterval-registered')
-      expect(recoveryIdx).toBeGreaterThanOrEqual(0)
-      expect(intervalIdx).toBeGreaterThan(recoveryIdx)
+      expect(scheduledIdx).toBeGreaterThanOrEqual(0)
+      expect(intervalIdx).toBeGreaterThan(scheduledIdx)
     } finally {
       globalThis.setInterval = originalSetInterval
     }

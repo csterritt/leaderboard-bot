@@ -13,14 +13,14 @@ The main entry point that wires all subsystems together and starts the bot.
 3. **Discord Client** — creates `discord.js` `Client` with intents: `Guilds`, `GuildMessages`, `MessageContent`. Logs `[startup] creating Discord client`.
 4. **Gateway handler** — `setupGatewayHandler(client, db)` registers `messageCreate` listener. Logs `[startup] setting up gateway handler`.
 5. **HTTP server** — `Bun.serve` on `PORT`; routes `POST /interactions` to `handleInteraction`; returns `404` for all other paths. Logs `[startup] starting HTTP server on port ...` and `[startup] HTTP server listening on port ...`.
-6. **Startup recovery** — calls `recoverAllChannels(db, token)` immediately (fire-and-forget with error logging). Runs before any interval tick. Logs `[startup] starting recovery pass`, `[startup] recovery pass complete` or `[startup] recovery failed`.
+6. **Startup scheduled work pass** — calls `runScheduledWork(db, token)` immediately (fire-and-forget with error logging). Runs recovery, leaderboard refresh, and pruning before any interval tick. Logs `[startup] starting scheduled work pass (recovery + leaderboard refresh)`, `[startup] startup scheduled work pass complete` or `[startup] scheduled work failed`.
 7. **Hourly interval** — `setInterval` at 3 600 000 ms calls `runScheduledWork(db, token)` with error logging. Logs `[startup] registering hourly scheduled work interval`, `[scheduled] hourly interval triggered`, `[scheduled] hourly work failed`.
 8. **Login** — `client.login(DISCORD_BOT_TOKEN)` starts the gateway connection. Logs `[startup] logging in to Discord`.
 9. **Graceful shutdown** — `createShutdown` from `utils/shutdown.ts` registers `SIGTERM` and `SIGINT` handlers that idempotently stop the HTTP server, clear the hourly interval, destroy the discord.js client, and close the database. Logs `[startup] received SIGTERM/SIGINT`, `[shutdown] shutting down gracefully...`, per-resource messages, `[shutdown] complete`. Final log: `[startup] bot is ready`.
 
 ## Key Design Rules
 
-- Recovery runs **at startup**, not deferred to the first interval tick.
+- Recovery and leaderboard refresh run **at startup** via `runScheduledWork`, not deferred to the first interval tick.
 - HTTP server handles only `POST /interactions`; all other requests return 404.
 - All errors from async operations are logged but do not crash the process.
 - `Bun.serve` is used for the HTTP layer (Bun runtime assumed).
@@ -31,7 +31,7 @@ The main entry point that wires all subsystems together and starts the bot.
 - [`handler-gateway.md`](handler-gateway.md) — `setupGatewayHandler`
 - [`handler-interactions.md`](handler-interactions.md) — `handleInteraction`
 - [`handler-scheduled.md`](handler-scheduled.md) — `runScheduledWork`
-- [`service-recovery.md`](service-recovery.md) — `recoverAllChannels`
+- [`service-recovery.md`](service-recovery.md) — `recoverAllChannels` (called internally by `runScheduledWork`)
 - [`schema.md`](schema.md) — applied on startup
 - [`types.md`](types.md) — `Env` interface documents all env vars
 - [`util-shutdown.md`](util-shutdown.md) — `createShutdown` graceful shutdown facility

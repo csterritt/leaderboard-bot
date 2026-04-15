@@ -311,6 +311,39 @@ describe('scheduled work (e2e)', () => {
     expect(postAfter.value).toBeNull()
   })
 
+  it('startup scenario: recovery backfills messages and leaderboard is posted in the same pass', async () => {
+    const t0 = clock.now()
+    const newMessage: DiscordMessage = makeDiscordMessage('msg-startup-recovery', 'startup-user', t0)
+
+    let postedContent: string | null = null
+
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
+      const u = String(url)
+      const method = opts?.method ?? 'GET'
+      if (u.includes(`/channels/${MC_ID}/messages`) && method === 'GET') {
+        const alreadyFetched = u.includes('after=msg-startup-recovery')
+        return new Response(JSON.stringify(alreadyFetched ? [] : [newMessage]), { status: 200 })
+      }
+      if (method === 'POST' && u.includes('/messages')) {
+        postedContent = JSON.parse(opts.body as string).content
+        return new Response(JSON.stringify({ id: 'startup-post-msg' }), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
+
+    const result = await runScheduledWork(db, TOKEN)
+    expect(result.isOk).toBe(true)
+
+    const stats = getUserStats(db, MC_ID, 'startup-user')
+    expect(stats.value?.runCount).toBe(1)
+
+    expect(postedContent).not.toBeNull()
+    expect(postedContent).toContain('startup-user')
+
+    const post = getLeaderboardPost(db, LC_ID)
+    expect(post.value?.messageId).toBe('startup-post-msg')
+  })
+
   it('prunes old processed_messages entries during scheduled work', async () => {
     seedUserStats(db, 'judy', 1, 1)
 

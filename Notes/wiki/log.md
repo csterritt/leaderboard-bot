@@ -246,3 +246,20 @@ Test results:
 - Total: 310 tests pass
 
 Note: Code coverage is not available with Bun runtime. If coverage is needed in the future, consider migrating tests to use a Node.js-compatible SQLite library (e.g., `better-sqlite3`) or wait for Bun to add inspector API support.
+
+## [2026-04-15] fix | Post/refresh leaderboard after startup recovery pass
+
+Fixed the startup path so leaderboards are refreshed immediately after recovery, not deferred up to 1 hour.
+
+**Root cause:** `src/index.ts` called `recoverAllChannels(db, token)` directly at startup, which only backfilled message stats. The leaderboard refresh step (format + hash + post) only ran in `runScheduledWork` (hourly interval). So after a bot restart, a newly valid or stale leaderboard could stay un-posted for up to 1 hour.
+
+**Fix (Option A from plan):** Replaced the bare `recoverAllChannels(db, token)` startup call with `runScheduledWork(db, token)`. `runScheduledWork` already runs recovery first, then refreshes leaderboards, then prunes — a direct drop-in. Updated surrounding log messages to reflect the change.
+
+Changes:
+
+- `src/index.ts`: removed `recoverAllChannels` import; replaced startup `recoverAllChannels` call and log messages with `runScheduledWork`; log now says `[startup] starting scheduled work pass (recovery + leaderboard refresh)`.
+- `tests/index.test.ts`: updated the startup ordering test to use `runScheduledWork` instead of `recoverAllChannels`; updated describe/it descriptions accordingly.
+- `e2e-tests/scheduled/scheduled-work.test.ts`: added new e2e test "startup scenario: recovery backfills messages and leaderboard is posted in the same pass" — verifies recovery finds a new message and the leaderboard is immediately posted within the same `runScheduledWork` call.
+- Wiki: updated `entry-point.md`, `tests-index.md`, `e2e-scheduled.md` to reflect the new startup behavior.
+
+All 354 tests pass (21 test files).

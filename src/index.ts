@@ -5,7 +5,6 @@ import { join } from 'path'
 import { setupGatewayHandler } from './handlers/gateway.js'
 import { handleInteraction } from './handlers/interactions.js'
 import { runScheduledWork } from './handlers/scheduled.js'
-import { recoverAllChannels } from './services/recovery.js'
 import { createShutdown } from './utils/shutdown.js'
 import { logger } from './utils/logger.js'
 
@@ -65,12 +64,12 @@ logger.log(`[startup] HTTP server listening on port ${server.port}`)
 
 // ─── 11.5 Startup recovery pass ───────────────────────────────────────────────
 
-logger.log('[startup] starting recovery pass')
-recoverAllChannels(db, token).then((result) => {
+logger.log('[startup] starting scheduled work pass (recovery + leaderboard refresh)')
+runScheduledWork(db, token).then((result) => {
   if (!result.isOk) {
-    logger.error('[startup] recovery failed:', result.error)
+    logger.error('[startup] scheduled work failed:', result.error)
   } else {
-    logger.log('[startup] recovery pass complete')
+    logger.log('[startup] startup scheduled work pass complete')
   }
 })
 
