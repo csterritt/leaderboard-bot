@@ -15,10 +15,11 @@ Orchestrates the scheduled work pipeline in order:
 1. **No-op guard** — fetches all `leaderboard_channels`; returns immediately if none are configured.
 2. **Recovery** — calls `recoverAllChannels(db, token)` to backfill any missed gateway messages.
 3. **Leaderboard refresh** — for each leaderboard channel:
-   - Looks up the linked monitored channel via `getMonitoredChannelByLeaderboard`.
-   - If no linked monitored channel exists: deletes any stale leaderboard post (message + DB row) and continues.
-   - Fetches leaderboard rows via `getLeaderboard(db, monitoredChannelId)`.
-   - Formats content with `formatLeaderboard(lc.channelName, rows)`.
+   - Looks up all linked monitored channels via `getMonitoredChannelsByLeaderboard`.
+   - If no linked monitored channels exist: deletes any stale leaderboard post (message + DB row) and continues.
+   - Fetches leaderboard rows for each linked monitored channel via `getLeaderboard`.
+   - **Single channel**: formats with `formatLeaderboard(lc.channelName, rows)`.
+   - **Multiple channels**: formats with `formatMultiChannelLeaderboard(sections)` — concatenates per-channel sections.
    - Computes FNV-1a hash via `hashContent(content)`.
    - **Skips posting** if `content_hash` in `leaderboard_posts` matches the new hash.
    - **Deletes the previous message** via `deleteMessage` (404 is tolerated as success).
@@ -51,8 +52,8 @@ Orchestrates the scheduled work pipeline in order:
 ## Cross-references
 
 - Uses [`service-recovery.md`](service-recovery.md) — `recoverAllChannels`
-- Uses [`service-leaderboard.md`](service-leaderboard.md) — `formatLeaderboard`, `hashContent`
+- Uses [`service-leaderboard.md`](service-leaderboard.md) — `formatLeaderboard`, `formatMultiChannelLeaderboard`, `hashContent`
 - Uses [`service-discord.md`](service-discord.md) — `sendMessage`, `deleteMessage`
-- Uses [`db-queries.md`](db-queries.md) — `getLeaderboardChannels`, `getMonitoredChannelByLeaderboard`, `getLeaderboard`, `getLeaderboardPost`, `upsertLeaderboardPost`, `deleteLeaderboardPost`, `pruneProcessedMessages`
+- Uses [`db-queries.md`](db-queries.md) — `getLeaderboardChannels`, `getMonitoredChannelsByLeaderboard`, `getLeaderboard`, `getLeaderboardPost`, `upsertLeaderboardPost`, `deleteLeaderboardPost`, `pruneProcessedMessages`
 - Uses [`constants.md`](constants.md) — `PRUNE_THRESHOLD_DAYS` (14)
 - Tests: [`tests-scheduled.md`](tests-scheduled.md)

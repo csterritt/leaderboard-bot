@@ -58,14 +58,18 @@ Checkpoint for the recovery/backfill service.
 
 ### `monitored_channels`
 
-Channels monitored for music uploads. Each leaderboard channel may have at most one linked monitored channel (enforced by `UNIQUE` on `leaderboard_channel_id`).
+Channels monitored for music uploads. A leaderboard channel may link to **multiple** monitored channels (many-to-many). Primary key is `(channel_id, leaderboard_channel_id)`.
 
-| Column                   | Type     | Notes                                                            |
-| ------------------------ | -------- | ---------------------------------------------------------------- |
-| `channel_id`             | TEXT     | PK                                                               |
-| `guild_id`               | TEXT     |                                                                  |
-| `leaderboard_channel_id` | TEXT     | UNIQUE FK → `leaderboard_channels(channel_id)` ON DELETE CASCADE |
-| `added_at`               | DATETIME |                                                                  |
+| Column                   | Type     | Notes                                                      |
+| ------------------------ | -------- | ---------------------------------------------------------- |
+| `channel_id`             | TEXT     | PK component                                               |
+| `guild_id`               | TEXT     |                                                            |
+| `leaderboard_channel_id` | TEXT     | PK component; FK → `leaderboard_channels` ON DELETE CASCADE |
+| `added_at`               | DATETIME |                                                            |
+
+Primary key: `(channel_id, leaderboard_channel_id)`
+
+**Migration**: At startup `src/index.ts` detects the old single-column PK (`channel_id` only) and transparently rewrites the table to the new composite PK schema, copying all existing rows.
 
 ### `processed_messages`
 

@@ -26,6 +26,40 @@ const schema = readFileSync(join(import.meta.dirname, 'db/schema.sql'), 'utf8')
 db.exec(schema)
 logger.log('[startup] database schema applied')
 
+// ─── 11.2a Migration: monitored_channels composite PK ────────────────────────
+
+logger.log('[startup] checking monitored_channels schema migration')
+{
+  const cols = db
+    .prepare('PRAGMA table_info(monitored_channels)')
+    .all() as Array<{ name: string; pk: number }>
+  const pkCols = cols.filter((c) => c.pk > 0).map((c) => c.name)
+  const needsMigration =
+    pkCols.length === 1 && pkCols[0] === 'channel_id'
+  if (needsMigration) {
+    logger.log('[startup] migrating monitored_channels to composite PK')
+    db.exec(`
+      BEGIN;
+      CREATE TABLE IF NOT EXISTS monitored_channels_new (
+        channel_id TEXT NOT NULL,
+        guild_id TEXT NOT NULL,
+        leaderboard_channel_id TEXT NOT NULL
+          REFERENCES leaderboard_channels(channel_id) ON DELETE CASCADE,
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (channel_id, leaderboard_channel_id)
+      );
+      INSERT INTO monitored_channels_new (channel_id, guild_id, leaderboard_channel_id, added_at)
+        SELECT channel_id, guild_id, leaderboard_channel_id, added_at FROM monitored_channels;
+      DROP TABLE monitored_channels;
+      ALTER TABLE monitored_channels_new RENAME TO monitored_channels;
+      COMMIT;
+    `)
+    logger.log('[startup] monitored_channels migration complete')
+  } else {
+    logger.log('[startup] monitored_channels schema already up to date')
+  }
+}
+
 // ─── 11.1 Discord client ──────────────────────────────────────────────────────
 
 logger.log('[startup] creating Discord client')

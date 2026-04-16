@@ -88,11 +88,12 @@ export const recoverAllChannels = async (
     return Result.err(channelsResult.error)
   }
 
-  logger.log(`[recovery] recovering ${channelsResult.value.length} channel(s)`)
-  for (const channel of channelsResult.value) {
-    const result = await recoverChannel(db, token, channel.channelId)
+  const uniqueChannelIds = [...new Set(channelsResult.value.map((c) => c.channelId))]
+  logger.log(`[recovery] recovering ${uniqueChannelIds.length} channel(s)`)
+  for (const channelId of uniqueChannelIds) {
+    const result = await recoverChannel(db, token, channelId)
     if (!result.isOk) {
-      logger.error(`[recovery] failed to recover channel ${channel.channelId}: ${result.error}`)
+      logger.error(`[recovery] failed to recover channel ${channelId}: ${result.error}`)
       return Result.err(result.error)
     }
   }

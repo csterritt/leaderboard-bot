@@ -304,20 +304,34 @@ const addMonitoredChannelActual = (db: Database, channel: MonitoredChannel): Res
     db.prepare(`
       INSERT INTO monitored_channels (channel_id, guild_id, leaderboard_channel_id)
       VALUES (?, ?, ?)
-      ON CONFLICT(channel_id) DO NOTHING
+      ON CONFLICT(channel_id, leaderboard_channel_id) DO NOTHING
     `).run(channel.channelId, channel.guildId, channel.leaderboardChannelId)
   })
 
 export const addMonitoredChannel = (db: Database, channel: MonitoredChannel): Result<void, Error> =>
   withRetry('addMonitoredChannel', () => addMonitoredChannelActual(db, channel))
 
-const deleteMonitoredChannelActual = (db: Database, channelId: string): Result<void, Error> =>
+const deleteMonitoredChannelActual = (
+  db: Database,
+  channelId: string,
+  leaderboardChannelId: string,
+): Result<void, Error> =>
   toResult(() => {
-    db.prepare('DELETE FROM monitored_channels WHERE channel_id = ?').run(channelId)
+    db
+      .prepare(
+        'DELETE FROM monitored_channels WHERE channel_id = ? AND leaderboard_channel_id = ?',
+      )
+      .run(channelId, leaderboardChannelId)
   })
 
-export const deleteMonitoredChannel = (db: Database, channelId: string): Result<void, Error> =>
-  withRetry('deleteMonitoredChannel', () => deleteMonitoredChannelActual(db, channelId))
+export const deleteMonitoredChannel = (
+  db: Database,
+  channelId: string,
+  leaderboardChannelId: string,
+): Result<void, Error> =>
+  withRetry('deleteMonitoredChannel', () =>
+    deleteMonitoredChannelActual(db, channelId, leaderboardChannelId),
+  )
 
 const isMonitoredChannelActual = (db: Database, channelId: string): Result<boolean, Error> =>
   toResult(() => {
@@ -328,23 +342,23 @@ const isMonitoredChannelActual = (db: Database, channelId: string): Result<boole
 export const isMonitoredChannel = (db: Database, channelId: string): Result<boolean, Error> =>
   withRetry('isMonitoredChannel', () => isMonitoredChannelActual(db, channelId))
 
-const getMonitoredChannelByLeaderboardActual = (
+const getMonitoredChannelsByLeaderboardActual = (
   db: Database,
   leaderboardChannelId: string,
-): Result<MonitoredChannel | null, Error> =>
+): Result<MonitoredChannel[], Error> =>
   toResult(() => {
-    const row = db
+    const rows = db
       .prepare('SELECT * FROM monitored_channels WHERE leaderboard_channel_id = ?')
-      .get(leaderboardChannelId) as MonitoredChannelRow | null
-    return row ? mapMonitoredChannel(row) : null
+      .all(leaderboardChannelId) as MonitoredChannelRow[]
+    return rows.map(mapMonitoredChannel)
   })
 
-export const getMonitoredChannelByLeaderboard = (
+export const getMonitoredChannelsByLeaderboard = (
   db: Database,
   leaderboardChannelId: string,
-): Result<MonitoredChannel | null, Error> =>
-  withRetry('getMonitoredChannelByLeaderboard', () =>
-    getMonitoredChannelByLeaderboardActual(db, leaderboardChannelId),
+): Result<MonitoredChannel[], Error> =>
+  withRetry('getMonitoredChannelsByLeaderboard', () =>
+    getMonitoredChannelsByLeaderboardActual(db, leaderboardChannelId),
   )
 
 // ─── 2.8 processed_messages ──────────────────────────────────────────────────

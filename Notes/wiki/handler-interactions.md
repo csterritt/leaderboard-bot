@@ -38,10 +38,11 @@ Testable entry point that accepts an injected verifier function. Returns `401` i
 - Defaults to `interaction.channel_id` when no `channel` option is provided.
 - For a different channel option, calls `fetchChannel` to resolve the display name.
 - Validates the target is in `leaderboard_channels`; returns an error message if not.
-- Calls `getMonitoredChannelByLeaderboard` to find the linked monitored channel.
-- Returns a helpful message if no monitored channel is linked.
-- Calls `getLeaderboard` only for the linked monitored channel (no cross-channel merging).
-- Passes the channel display name into `formatLeaderboard`.
+- Calls `getMonitoredChannelsByLeaderboard` to find all linked monitored channels.
+- Returns a helpful message if no monitored channels are linked.
+- Calls `getLeaderboard` for each linked monitored channel.
+- **Single channel**: uses `formatLeaderboard(lc.channelName, rows)` as before.
+- **Multiple channels**: uses `formatMultiChannelLeaderboard(sections)` — concatenates per-channel sections separated by a blank line.
 - Always responds as ephemeral (flags = 64).
 
 ### `/setleaderboardchannel`
@@ -61,13 +62,14 @@ Testable entry point that accepts an injected verifier function. Returns `401` i
 
 - Requires guild context and `ADMINISTRATOR` permission.
 - Validates the current channel is in `leaderboard_channels`.
-- Rejects if the leaderboard channel already has a **different** linked monitored channel.
-- Idempotent: adding the same channel again succeeds silently.
+- Allows multiple monitored channels to be linked to the same leaderboard channel (many-to-many).
+- Idempotent: adding the same `(monitored_channel, leaderboard_channel)` pair again succeeds silently.
 
 ### `/removemonitoredchannel <channel>`
 
 - Requires guild context and `ADMINISTRATOR` permission.
-- Removes the specified channel from `monitored_channels`.
+- Must be run from a leaderboard channel (validates via `getLeaderboardChannel`); returns an error if not.
+- Removes the specific `(monitored_channel, current_leaderboard_channel)` link from `monitored_channels` — other links for the same monitored channel are preserved.
 - Preserves all historical rows.
 
 ## Guards
@@ -81,4 +83,4 @@ Testable entry point that accepts an injected verifier function. Returns `401` i
 - Uses [`util-permissions.md`](util-permissions.md) — `hasAdministratorPermission`
 - Uses [`db-queries.md`](db-queries.md) — leaderboard channel CRUD, monitored channel CRUD, `getLeaderboard`
 - Uses [`service-discord.md`](service-discord.md) — `fetchChannel`
-- Uses [`service-leaderboard.md`](service-leaderboard.md) — `formatLeaderboard`
+- Uses [`service-leaderboard.md`](service-leaderboard.md) — `formatLeaderboard`, `formatMultiChannelLeaderboard`

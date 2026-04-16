@@ -489,6 +489,128 @@ describe('slash commands (e2e)', () => {
     })
   })
 
+  // ─── Multi-channel (many-to-many) ──────────────────────────────────────────
+
+  describe('multi-channel (many-to-many)', () => {
+    it('allows adding a second monitored channel to the same leaderboard channel', async () => {
+      upsertLeaderboardChannel(db, {
+        channelId: LC_ID,
+        guildId: GUILD_ID,
+        channelName: '#leaderboard',
+        addedByUserId: 'admin',
+      })
+
+      const addFirst: DiscordInteraction = {
+        id: 'i-m2m-1',
+        type: 2,
+        guild_id: GUILD_ID,
+        channel_id: LC_ID,
+        member: { nick: null, permissions: ADMIN_PERMS },
+        data: { name: 'addmonitoredchannel', options: [{ name: 'channel', value: 'mc-x1' }] },
+      }
+      const addSecond: DiscordInteraction = {
+        id: 'i-m2m-2',
+        type: 2,
+        guild_id: GUILD_ID,
+        channel_id: LC_ID,
+        member: { nick: null, permissions: ADMIN_PERMS },
+        data: { name: 'addmonitoredchannel', options: [{ name: 'channel', value: 'mc-x2' }] },
+      }
+
+      await handleInteractionWithVerifier(makeRequest(addFirst), db, TOKEN, alwaysValidVerifier)
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(addSecond),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
+      expect(resp.status).toBe(200)
+
+      const channels = getMonitoredChannels(db)
+      const ids = channels.value?.map((c: { channelId: string }) => c.channelId)
+      expect(ids).toContain('mc-x1')
+      expect(ids).toContain('mc-x2')
+    })
+
+    it('/leaderboard shows data from all linked monitored channels', async () => {
+      seedLeaderboardAndMonitor(db)
+      addMonitoredChannel(db, {
+        channelId: 'mc-extra',
+        guildId: GUILD_ID,
+        leaderboardChannelId: LC_ID,
+      })
+      upsertUserStats(db, {
+        channelId: MC_ID,
+        userId: 'user-a',
+        username: 'Alice',
+        lastMusicPostAt: 1_700_000_000,
+        runCount: 3,
+        highestRunSeen: 3,
+      })
+      upsertUserStats(db, {
+        channelId: 'mc-extra',
+        userId: 'user-b',
+        username: 'Bob',
+        lastMusicPostAt: 1_700_000_000,
+        runCount: 5,
+        highestRunSeen: 5,
+      })
+
+      const interaction: DiscordInteraction = {
+        id: 'i-lb-multi',
+        type: 2,
+        guild_id: GUILD_ID,
+        channel_id: LC_ID,
+        channel: { id: LC_ID, name: 'leaderboard' },
+        member: { nick: null, permissions: ADMIN_PERMS },
+        data: { name: 'leaderboard' },
+      }
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
+      expect(resp.status).toBe(200)
+      const body = (await extractResponseBody(resp)) as { data?: { content?: string } }
+      expect(body.data?.content).toContain('Alice')
+      expect(body.data?.content).toContain('Bob')
+    })
+
+    it('/removemonitoredchannel removes only the specified link', async () => {
+      seedLeaderboardAndMonitor(db)
+      addMonitoredChannel(db, {
+        channelId: 'mc-keep',
+        guildId: GUILD_ID,
+        leaderboardChannelId: LC_ID,
+      })
+
+      const interaction: DiscordInteraction = {
+        id: 'i-rm-one',
+        type: 2,
+        guild_id: GUILD_ID,
+        channel_id: LC_ID,
+        member: { nick: null, permissions: ADMIN_PERMS },
+        data: {
+          name: 'removemonitoredchannel',
+          options: [{ name: 'channel', value: MC_ID }],
+        },
+      }
+      const resp = await handleInteractionWithVerifier(
+        makeRequest(interaction),
+        db,
+        TOKEN,
+        alwaysValidVerifier,
+      )
+      expect(resp.status).toBe(200)
+
+      const channels = getMonitoredChannels(db)
+      const ids = channels.value?.map((c: { channelId: string }) => c.channelId)
+      expect(ids).not.toContain(MC_ID)
+      expect(ids).toContain('mc-keep')
+    })
+  })
+
   // ─── Full workflow: setup → post music → view leaderboard ──────────────────
 
   describe('full admin setup workflow (e2e)', () => {

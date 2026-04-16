@@ -7,12 +7,12 @@ import {
   deleteLeaderboardPost,
   addMonitoredChannel,
   deleteMonitoredChannel,
-  getMonitoredChannelByLeaderboard,
+  getMonitoredChannelsByLeaderboard,
   getLeaderboard,
 } from '../db/queries.js'
 import { fetchChannel } from '../services/discord.js'
-import { formatLeaderboard } from '../services/leaderboard.js'
-import type { Database, DiscordInteraction } from '../types.js'
+import { formatLeaderboard, formatMultiChannelLeaderboard } from '../services/leaderboard.js'
+import type { Database, DiscordInteraction, LeaderboardRow } from '../types.js'
 import { logger } from '../utils/logger.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -78,20 +78,27 @@ async function handleLeaderboard(
 
   const channelName = targetChannelName ?? lcResult.value.channelName
 
-  const monitoredResult = getMonitoredChannelByLeaderboard(db, targetChannelId)
+  const monitoredResult = getMonitoredChannelsByLeaderboard(db, targetChannelId)
   if (!monitoredResult.isOk)
     return Response.json(ephemeralMessage('Database error.'), { status: 200 })
-  if (!monitoredResult.value) {
+  if (monitoredResult.value.length === 0) {
     return Response.json(
       ephemeralMessage(`No monitored channel is linked to <#${targetChannelId}> yet.`),
       { status: 200 },
     )
   }
 
-  const lbResult = getLeaderboard(db, monitoredResult.value.channelId)
-  if (!lbResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
+  const sections: Array<{ channelName: string; rows: LeaderboardRow[] }> = []
+  for (const mc of monitoredResult.value) {
+    const lbResult = getLeaderboard(db, mc.channelId)
+    if (!lbResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
+    sections.push({ channelName: mc.channelId, rows: lbResult.value })
+  }
 
-  const content = formatLeaderboard(channelName, lbResult.value)
+  const content =
+    sections.length === 1
+      ? formatLeaderboard(channelName, sections[0]!.rows)
+      : formatMultiChannelLeaderboard(sections)
   return Response.json(ephemeralMessage(content), { status: 200 })
 }
 
@@ -160,18 +167,6 @@ function handleAddMonitoredChannel(interaction: DiscordInteraction, db: Database
   }
   const monitoredChannelId = String(channelOption.value)
 
-  const existingResult = getMonitoredChannelByLeaderboard(db, leaderboardChannelId)
-  if (!existingResult.isOk)
-    return Response.json(ephemeralMessage('Database error.'), { status: 200 })
-  if (existingResult.value && existingResult.value.channelId !== monitoredChannelId) {
-    return Response.json(
-      ephemeralMessage(
-        `This leaderboard channel is already linked to <#${existingResult.value.channelId}>. Remove it first.`,
-      ),
-      { status: 200 },
-    )
-  }
-
   const addResult = addMonitoredChannel(db, {
     channelId: monitoredChannelId,
     guildId,
@@ -189,13 +184,26 @@ function handleRemoveMonitoredChannel(interaction: DiscordInteraction, db: Datab
   const guard = guildGuard(interaction) ?? adminGuard(interaction)
   if (guard) return guard
 
+  const leaderboardChannelId = interaction.channel_id
+
+  const lcResult = getLeaderboardChannel(db, leaderboardChannelId)
+  if (!lcResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
+  if (!lcResult.value) {
+    return Response.json(
+      ephemeralMessage(
+        `<#${leaderboardChannelId}> is not a leaderboard channel. Run /setleaderboardchannel first.`,
+      ),
+      { status: 200 },
+    )
+  }
+
   const channelOption = interaction.data?.options?.find((o) => o.name === 'channel')
   if (!channelOption) {
     return Response.json(ephemeralMessage('Missing channel option.'), { status: 200 })
   }
   const monitoredChannelId = String(channelOption.value)
 
-  const deleteResult = deleteMonitoredChannel(db, monitoredChannelId)
+  const deleteResult = deleteMonitoredChannel(db, monitoredChannelId, leaderboardChannelId)
   if (!deleteResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
 
   return Response.json(ephemeralMessage(`<#${monitoredChannelId}> is no longer being monitored.`), {

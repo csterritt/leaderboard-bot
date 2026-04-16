@@ -440,6 +440,44 @@ describe('runScheduledWork', () => {
     )
   })
 
+  it('builds a combined multi-section post when a leaderboard channel monitors multiple channels', async () => {
+    seedLeaderboardChannel(db, LC_ID, MC_ID)
+    addMonitoredChannel(db, { channelId: 'mc-extra', guildId: GUILD_ID, leaderboardChannelId: LC_ID })
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'user-1',
+      username: 'alice',
+      lastMusicPostAt: Date.now(),
+      runCount: 3,
+      highestRunSeen: 3,
+    })
+    upsertUserStats(db, {
+      channelId: 'mc-extra',
+      userId: 'user-2',
+      username: 'bob',
+      lastMusicPostAt: Date.now(),
+      runCount: 5,
+      highestRunSeen: 5,
+    })
+
+    let postedContent = ''
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      const urlStr = String(url)
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST') {
+        const body = JSON.parse(opts?.body as string)
+        postedContent = body.content
+        return new Response(JSON.stringify({ id: 'msg-multi' }), { status: 200 })
+      }
+      return new Response('{}', { status: 200 })
+    }) as any
+
+    const result = await runScheduledWork(db, TOKEN)
+    expect(result.isOk).toBe(true)
+    expect(postedContent).toContain('alice')
+    expect(postedContent).toContain('bob')
+  })
+
   it('logs pruned processed messages', async () => {
     seedLeaderboardChannel(db)
 

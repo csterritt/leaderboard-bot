@@ -34,10 +34,12 @@ CREATE TABLE IF NOT EXISTS recovery_state (
 );
 
 CREATE TABLE IF NOT EXISTS monitored_channels (
-    channel_id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
     guild_id TEXT NOT NULL,
-    leaderboard_channel_id TEXT NOT NULL UNIQUE REFERENCES leaderboard_channels(channel_id) ON DELETE CASCADE,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    leaderboard_channel_id TEXT NOT NULL
+        REFERENCES leaderboard_channels(channel_id) ON DELETE CASCADE,
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (channel_id, leaderboard_channel_id)
 );
 
 CREATE TABLE IF NOT EXISTS processed_messages (

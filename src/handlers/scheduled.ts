@@ -1,7 +1,7 @@
 import { Result } from 'true-myth'
 import {
   getLeaderboardChannels,
-  getMonitoredChannelByLeaderboard,
+  getMonitoredChannelsByLeaderboard,
   getLeaderboard,
   getLeaderboardPost,
   upsertLeaderboardPost,
@@ -9,10 +9,10 @@ import {
   pruneProcessedMessages,
 } from '../db/queries.js'
 import { recoverAllChannels } from '../services/recovery.js'
-import { formatLeaderboard, hashContent } from '../services/leaderboard.js'
+import { formatLeaderboard, formatMultiChannelLeaderboard, hashContent } from '../services/leaderboard.js'
 import { sendMessage, deleteMessage } from '../services/discord.js'
 import { PRUNE_THRESHOLD_DAYS } from '../constants.js'
-import type { Database } from '../types.js'
+import type { Database, LeaderboardRow } from '../types.js'
 import { logger } from '../utils/logger.js'
 
 // ─── 10.1 runScheduledWork ────────────────────────────────────────────────────
@@ -36,13 +36,13 @@ export const runScheduledWork = async (
 
   for (const lc of channelsResult.value) {
     logger.log(`[scheduled] processing leaderboard channel: ${lc.channelId} (${lc.channelName})`)
-    const monitoredResult = getMonitoredChannelByLeaderboard(db, lc.channelId)
+    const monitoredResult = getMonitoredChannelsByLeaderboard(db, lc.channelId)
     if (!monitoredResult.isOk) return Result.err(monitoredResult.error)
 
     const existingPostResult = getLeaderboardPost(db, lc.channelId)
     if (!existingPostResult.isOk) return Result.err(existingPostResult.error)
 
-    if (!monitoredResult.value) {
+    if (monitoredResult.value.length === 0) {
       if (existingPostResult.value) {
         logger.log(`[scheduled] removing orphaned leaderboard post for channel: ${lc.channelId}`)
         const delResult = await deleteMessage(
@@ -59,11 +59,17 @@ export const runScheduledWork = async (
       continue
     }
 
-    const monitoredChannelId = monitoredResult.value.channelId
-    const rowsResult = getLeaderboard(db, monitoredChannelId)
-    if (!rowsResult.isOk) return Result.err(rowsResult.error)
+    const sections: Array<{ channelName: string; rows: LeaderboardRow[] }> = []
+    for (const mc of monitoredResult.value) {
+      const rowsResult = getLeaderboard(db, mc.channelId)
+      if (!rowsResult.isOk) return Result.err(rowsResult.error)
+      sections.push({ channelName: mc.channelId, rows: rowsResult.value })
+    }
 
-    const content = formatLeaderboard(lc.channelName, rowsResult.value)
+    const content =
+      sections.length === 1
+        ? formatLeaderboard(lc.channelName, sections[0]!.rows)
+        : formatMultiChannelLeaderboard(sections)
     const newHash = hashContent(content)
 
     if (existingPostResult.value?.contentHash === newHash) {

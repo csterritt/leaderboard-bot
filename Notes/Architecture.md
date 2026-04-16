@@ -4,7 +4,12 @@
 
 A Discord bot built with **discord.js** for gateway event ingestion and **better-sqlite3** for persistence, running on **Bun**. The bot listens for `MESSAGE_CREATE` events through the Discord Gateway, tracks music file uploads per channel, maintains per-user streak statistics based on post timing, and posts a separate leaderboard inside each configured leaderboard channel.
 
-Monitored channels and leaderboard channels are configured independently. A monitored channel links to the leaderboard channel where its stats are displayed.
+Monitored channels and leaderboard channels have a **many-to-many** relationship:
+
+- A single leaderboard channel can monitor **multiple** monitored channels. It displays individual leaderboards for each one, with each leaderboard naming its monitored channel and showing stats from that channel only. Stats are never merged across channels.
+- A single monitored channel can feed **multiple** leaderboard channels. Posting music in it updates leaderboards in every linked leaderboard channel.
+
+This allows flexible configurations such as a leaderboard channel showing per-channel breakdowns for several topic channels, or a single busy channel feeding dashboards in multiple guild areas.
 
 Slash commands are handled through Discord Interactions over HTTP, while message ingestion happens through the Gateway event stream. The `discord.js` library manages the gateway lifecycle (heartbeat, reconnection, session resume).
 
@@ -90,12 +95,14 @@ CREATE TABLE IF NOT EXISTS recovery_state (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Channels that should be scanned for music uploads, linked to a leaderboard channel
+-- Junction table: many-to-many link between monitored channels and leaderboard channels
 CREATE TABLE IF NOT EXISTS monitored_channels (
-    channel_id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
     guild_id TEXT NOT NULL,
-    leaderboard_channel_id TEXT NOT NULL,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    leaderboard_channel_id TEXT NOT NULL
+        REFERENCES leaderboard_channels(channel_id) ON DELETE CASCADE,
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (channel_id, leaderboard_channel_id)
 );
 
 -- Message IDs already processed, used for idempotency across gateway and recovery paths
@@ -177,8 +184,9 @@ Update last_music_post_at = T_now
 - Channel name resolution:
   - Current channel: from `interaction.channel.name`
   - Provided channel: via `fetchChannel` Discord API call
-- Queries all `monitored_channels` linked to the target leaderboard channel, merges their `user_stats` rows
-- Sorted by `run_count DESC, highest_run_seen DESC`
+- Queries all `monitored_channels` linked to the target leaderboard channel
+- For each linked monitored channel, queries and formats an individual leaderboard section (channel name + stats from that channel only)
+- Each section is sorted by `run_count DESC, highest_run_seen DESC`
 - Returns an ephemeral response
 
 **`/setleaderboardchannel`**
@@ -194,7 +202,7 @@ Update last_music_post_at = T_now
 
 - Takes no arguments; operates on the current channel
 - Removes the current channel from `leaderboard_channels`
-- Removes all `monitored_channels` rows that reference this leaderboard channel
+- Removes all `monitored_channels` rows that reference this leaderboard channel (CASCADE via FK)
 - Deletes any stored `leaderboard_posts` row for that channel
 - Stops future tracking and posting but keeps historical `user_stats`, `recovery_state`, and `processed_messages` rows intact
 - Requires the invoking member to have the `ADMINISTRATOR` permission
@@ -205,14 +213,16 @@ Update last_music_post_at = T_now
 - Takes one required argument: the channel to monitor for music uploads
 - Must be run from a leaderboard channel (the current channel must be in `leaderboard_channels`)
 - Adds the provided channel to `monitored_channels` with `leaderboard_channel_id` set to the current channel
-- Idempotent (adding the same channel again does not error)
+- A leaderboard channel can monitor multiple channels; a monitored channel can be linked to multiple leaderboard channels
+- Idempotent (adding the same channel+leaderboard pair again does not error)
 - Requires the invoking member to have the `ADMINISTRATOR` permission
 - Responds with confirmation or permission denied error
 
 **`/removemonitoredchannel <channel>`**
 
 - Takes one required argument: the channel to stop monitoring
-- Removes the provided channel from `monitored_channels`
+- Must be run from a leaderboard channel — removes only the link between the specified monitored channel and the current leaderboard channel
+- Other leaderboard channels monitoring the same channel are unaffected
 - Does not delete historical `user_stats`, `recovery_state`, or `processed_messages` rows
 - Requires the invoking member to have the `ADMINISTRATOR` permission
 - Responds with confirmation or permission denied error
@@ -220,16 +230,23 @@ Update last_music_post_at = T_now
 **Response Format**:
 
 ```
-🎵 Music Leaderboard for #channel-name 🎵
+🎵 Music Leaderboard for #monitored-channel-a 🎵
 
 Rank | User | Current Run | Best Run
 -----|------|-------------|----------
 1    | @user1 | 5 | 12
 2    | @user2 | 3 | 8
-3    | @user3 | 1 | 5
+
+🎵 Music Leaderboard for #monitored-channel-b 🎵
+
+Rank | User | Current Run | Best Run
+-----|------|-------------|----------
+1    | @user3 | 1 | 5
 ```
 
-**Query** (per monitored channel, then merged across all monitored channels for a leaderboard):
+When a leaderboard channel monitors a single channel, only one section is shown. When it monitors multiple channels, each gets its own section.
+
+**Query** (run once per linked monitored channel — no cross-channel merging):
 
 ```sql
 SELECT
@@ -254,9 +271,9 @@ Hourly Timer → runScheduledWork
 1. Recover all monitored channels
     ↓
 2. For each leaderboard_channels entry:
-    ├─ Query all monitored_channels linked to this leaderboard channel
-    ├─ For each linked monitored channel, query user_stats and merge rows
-    ├─ Format leaderboard content using the stored channel_name
+    ├─ Query all monitored_channels linked to this leaderboard channel (may be multiple)
+    ├─ For each linked monitored channel, query user_stats and format an individual section
+    ├─ Concatenate all sections into one message
     ├─ Hash rendered content (FNV-1a)
     ├─ Compare against leaderboard_posts.content_hash for the channel
     ├─ If unchanged → skip posting

@@ -8,7 +8,7 @@ import {
   addMonitoredChannel,
   getLeaderboardChannel,
   getMonitoredChannels,
-  getMonitoredChannelByLeaderboard,
+  getMonitoredChannelsByLeaderboard,
   upsertUserStats,
 } from '../src/db/queries.js'
 import type { Database as DatabaseType, DiscordInteraction } from '../src/types.js'
@@ -485,8 +485,8 @@ describe('/removeleaderboardchannel', () => {
 
   it('removes all monitored_channels rows referencing this leaderboard channel (cascade)', async () => {
     await dispatch(db, makeInteraction({ data: { name: 'removeleaderboardchannel' } }))
-    const monitored = getMonitoredChannelByLeaderboard(db, LC_ID)
-    expect(monitored.value).toBeNull()
+    const monitored = getMonitoredChannelsByLeaderboard(db, LC_ID)
+    expect(monitored.value).toEqual([])
   })
 
   it('deletes the stored leaderboard_posts row for the channel', async () => {
@@ -581,8 +581,8 @@ describe('/addmonitoredchannel', () => {
         data: { name: 'addmonitoredchannel', options: [{ name: 'channel', value: MC_ID }] },
       }),
     )
-    const linked = getMonitoredChannelByLeaderboard(db, LC_ID)
-    expect(linked.value?.channelId).toBe(MC_ID)
+    const linked = getMonitoredChannelsByLeaderboard(db, LC_ID)
+    expect(linked.value?.map((c) => c.channelId)).toContain(MC_ID)
   })
 
   it('is idempotent — adding same channel again does not error', async () => {
@@ -601,7 +601,7 @@ describe('/addmonitoredchannel', () => {
     expect(res.status).toBe(200)
   })
 
-  it('rejects linking a different monitored channel when this leaderboard channel already has one', async () => {
+  it('allows linking a different monitored channel when this leaderboard channel already has one (many-to-many)', async () => {
     await dispatch(
       db,
       makeInteraction({
@@ -614,8 +614,9 @@ describe('/addmonitoredchannel', () => {
         data: { name: 'addmonitoredchannel', options: [{ name: 'channel', value: 'other-mc' }] },
       }),
     )
-    const body = (await res.json()) as { data: { content: string } }
-    expect(body.data.content).toContain('already linked')
+    expect(res.status).toBe(200)
+    const monitored = getMonitoredChannelsByLeaderboard(db, LC_ID)
+    expect(monitored.value!.length).toBe(2)
   })
 })
 
@@ -675,15 +676,30 @@ describe('/removemonitoredchannel', () => {
     expect(body.data.content).toContain('permission')
   })
 
-  it('removes the provided channel from monitored_channels', async () => {
+  it('removes the specific link between the current leaderboard channel and the monitored channel', async () => {
     await dispatch(
       db,
       makeInteraction({
+        channel_id: LC_ID,
+        channel: { id: LC_ID, name: 'leaderboard' },
         data: { name: 'removemonitoredchannel', options: [{ name: 'channel', value: MC_ID }] },
       }),
     )
     const monitored = getMonitoredChannels(db)
     expect(monitored.value).toHaveLength(0)
+  })
+
+  it('rejects removemonitoredchannel when run from a non-leaderboard channel', async () => {
+    const res = await dispatch(
+      db,
+      makeInteraction({
+        channel_id: 'not-a-lb',
+        channel: { id: 'not-a-lb', name: 'general' },
+        data: { name: 'removemonitoredchannel', options: [{ name: 'channel', value: MC_ID }] },
+      }),
+    )
+    const body = (await res.json()) as { data: { content: string } }
+    expect(body.data.content).toContain('leaderboard channel')
   })
 
   it('does not delete historical user_stats rows', async () => {

@@ -2,6 +2,16 @@
 
 Leaderboard formatting and content hashing. Pure functions — no DB access.
 
+## formatMultiChannelLeaderboard
+
+```typescript
+formatMultiChannelLeaderboard(
+  sections: Array<{ channelName: string; rows: LeaderboardRow[] }>
+): string
+```
+
+Formats a combined leaderboard for a leaderboard channel that monitors multiple source channels. Calls `formatLeaderboard` for each section and joins them with `\n\n`. Used by both `handler-interactions.ts` and `handler-scheduled.ts` when there are two or more linked monitored channels.
+
 ## formatLeaderboard
 
 ```typescript

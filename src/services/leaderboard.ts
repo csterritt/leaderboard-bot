@@ -23,6 +23,10 @@ const escapeUsername = (username: string): string => {
   return safe
 }
 
+export const formatMultiChannelLeaderboard = (
+  sections: Array<{ channelName: string; rows: LeaderboardRow[] }>,
+): string => sections.map((s) => formatLeaderboard(s.channelName, s.rows)).join('\n\n')
+
 export const formatLeaderboard = (channelName: string, rows: LeaderboardRow[]): string => {
   const header = `**🎵 Music Leaderboard — #${channelName}**\n`
 

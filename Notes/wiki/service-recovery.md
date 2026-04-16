@@ -24,7 +24,8 @@ Performs backfill recovery for monitored channels by fetching messages from the 
 
 ### `recoverAllChannels(db, token): Promise<Result<void, Error>>`
 
-- Calls `getMonitoredChannels` and iterates, calling `recoverChannel` for each.
+- Calls `getMonitoredChannels` and deduplicates by `channelId` (a monitored channel may appear multiple times if it is linked to multiple leaderboard channels).
+- Iterates the deduplicated set, calling `recoverChannel` for each.
 - Returns `Result.err` on the first channel that fails.
 - Succeeds with `Result.ok(undefined)` when there are no monitored channels.
 
