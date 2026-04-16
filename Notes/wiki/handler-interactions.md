@@ -16,6 +16,24 @@ Public entry point. Verifies the request signature using `verifyDiscordSignature
 
 Testable entry point that accepts an injected verifier function. Returns `401` if headers are missing or the verifier returns false. Parses the body as `DiscordInteraction` and dispatches to `routeInteraction`.
 
+### `recoverAndRefreshLeaderboard(db, token, monitoredChannelId, leaderboardChannelId): Promise<void>`
+
+Runs recovery for a single monitored channel, then refreshes the leaderboard post for the associated leaderboard channel. Used as fire-and-forget by `/addmonitoredchannel`. Exported for direct testing.
+
+1. Calls `recoverChannel` for the monitored channel.
+2. Gets all monitored channels for the leaderboard, builds leaderboard sections.
+3. Computes content hash; skips posting if unchanged.
+4. Deletes old leaderboard message (if any), posts new one, upserts `leaderboard_posts`.
+5. All errors are caught and logged — never throws.
+
+**Logging:**
+
+- `[interactions] recovery failed for channel <id>: <error>` — on recovery failure.
+- `[interactions] leaderboard unchanged for channel: <id>` — on content hash match.
+- `[interactions] leaderboard post updated for channel: <id>` — after successful post.
+- `[interactions] recoverAndRefreshLeaderboard error: <msg>` — on unexpected error.
+- `[interactions] fire-and-forget error: <msg>` — on uncaught promise rejection from fire-and-forget call.
+
 **Logging:**
 
 - `[interactions] missing signature headers` — `console.warn` on missing signature/ timestamp headers.
@@ -64,6 +82,10 @@ Testable entry point that accepts an injected verifier function. Returns `401` i
 - Validates the current channel is in `leaderboard_channels`.
 - Allows multiple monitored channels to be linked to the same leaderboard channel (many-to-many).
 - Idempotent: adding the same `(monitored_channel, leaderboard_channel)` pair again succeeds silently.
+- After inserting the DB row, kicks off a **fire-and-forget** call to `recoverAndRefreshLeaderboard`, which:
+  - Runs `recoverChannel` to backfill historical messages for the newly added channel.
+  - Rebuilds and posts/updates the leaderboard in the leaderboard channel.
+- The ephemeral response is returned immediately — recovery and leaderboard refresh happen asynchronously.
 
 ### `/removemonitoredchannel <channel>`
 
@@ -81,6 +103,7 @@ Testable entry point that accepts an injected verifier function. Returns `401` i
 
 - Uses [`util-signature.md`](util-signature.md) — `verifyDiscordSignature`
 - Uses [`util-permissions.md`](util-permissions.md) — `hasAdministratorPermission`
-- Uses [`db-queries.md`](db-queries.md) — leaderboard channel CRUD, monitored channel CRUD, `getLeaderboard`
-- Uses [`service-discord.md`](service-discord.md) — `fetchChannel`
-- Uses [`service-leaderboard.md`](service-leaderboard.md) — `formatLeaderboard`, `formatMultiChannelLeaderboard`
+- Uses [`db-queries.md`](db-queries.md) — leaderboard channel CRUD, monitored channel CRUD, `getLeaderboard`, `getLeaderboardPost`, `upsertLeaderboardPost`
+- Uses [`service-discord.md`](service-discord.md) — `fetchChannel`, `sendMessage`, `deleteMessage`
+- Uses [`service-leaderboard.md`](service-leaderboard.md) — `formatLeaderboard`, `formatMultiChannelLeaderboard`, `hashContent`
+- Uses [`service-recovery.md`](service-recovery.md) — `recoverChannel`

@@ -9,9 +9,12 @@ import {
   deleteMonitoredChannel,
   getMonitoredChannelsByLeaderboard,
   getLeaderboard,
+  getLeaderboardPost,
+  upsertLeaderboardPost,
 } from '../db/queries.js'
-import { fetchChannel } from '../services/discord.js'
-import { formatLeaderboard, formatMultiChannelLeaderboard } from '../services/leaderboard.js'
+import { fetchChannel, sendMessage, deleteMessage } from '../services/discord.js'
+import { formatLeaderboard, formatMultiChannelLeaderboard, hashContent } from '../services/leaderboard.js'
+import { recoverChannel } from '../services/recovery.js'
 import type { Database, DiscordInteraction, LeaderboardRow } from '../types.js'
 import { logger } from '../utils/logger.js'
 
@@ -143,7 +146,82 @@ function handleRemoveLeaderboardChannel(interaction: DiscordInteraction, db: Dat
   )
 }
 
-function handleAddMonitoredChannel(interaction: DiscordInteraction, db: Database): Response {
+// ─── Recovery + leaderboard refresh (fire-and-forget) ───────────────────────
+
+export const recoverAndRefreshLeaderboard = async (
+  db: Database,
+  token: string,
+  monitoredChannelId: string,
+  leaderboardChannelId: string,
+): Promise<void> => {
+  try {
+    const recoveryResult = await recoverChannel(db, token, monitoredChannelId)
+    if (!recoveryResult.isOk) {
+      logger.error(
+        `[interactions] recovery failed for channel ${monitoredChannelId}: ${recoveryResult.error}`,
+      )
+      return
+    }
+
+    const lcResult = getLeaderboardChannel(db, leaderboardChannelId)
+    if (!lcResult.isOk || !lcResult.value) return
+
+    const monitoredResult = getMonitoredChannelsByLeaderboard(db, leaderboardChannelId)
+    if (!monitoredResult.isOk || monitoredResult.value.length === 0) return
+
+    const sections: Array<{ channelName: string; rows: LeaderboardRow[] }> = []
+    for (const mc of monitoredResult.value) {
+      const rowsResult = getLeaderboard(db, mc.channelId)
+      if (!rowsResult.isOk) return
+      sections.push({ channelName: mc.channelId, rows: rowsResult.value })
+    }
+
+    const content =
+      sections.length === 1
+        ? formatLeaderboard(lcResult.value.channelName, sections[0]!.rows)
+        : formatMultiChannelLeaderboard(sections)
+    const newHash = hashContent(content)
+
+    const existingPostResult = getLeaderboardPost(db, leaderboardChannelId)
+    if (!existingPostResult.isOk) return
+
+    if (existingPostResult.value?.contentHash === newHash) {
+      logger.log(`[interactions] leaderboard unchanged for channel: ${leaderboardChannelId}`)
+      return
+    }
+
+    if (existingPostResult.value) {
+      const delResult = await deleteMessage(
+        token,
+        leaderboardChannelId,
+        existingPostResult.value.messageId,
+      )
+      if (!delResult.isOk) return
+    }
+
+    const sendResult = await sendMessage(token, leaderboardChannelId, content)
+    if (!sendResult.isOk) return
+
+    upsertLeaderboardPost(db, {
+      channelId: leaderboardChannelId,
+      messageId: sendResult.value,
+      contentHash: newHash,
+    })
+    logger.log(
+      `[interactions] leaderboard post updated for channel: ${leaderboardChannelId}`,
+    )
+  } catch (error) {
+    logger.error(
+      `[interactions] recoverAndRefreshLeaderboard error: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
+
+function handleAddMonitoredChannel(
+  interaction: DiscordInteraction,
+  db: Database,
+  token: string,
+): Response {
   const guard = guildGuard(interaction) ?? adminGuard(interaction)
   if (guard) return guard
 
@@ -173,6 +251,14 @@ function handleAddMonitoredChannel(interaction: DiscordInteraction, db: Database
     leaderboardChannelId,
   })
   if (!addResult.isOk) return Response.json(ephemeralMessage('Database error.'), { status: 200 })
+
+  recoverAndRefreshLeaderboard(db, token, monitoredChannelId, leaderboardChannelId).catch(
+    (error) => {
+      logger.error(
+        `[interactions] fire-and-forget error: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    },
+  )
 
   return Response.json(
     ephemeralMessage(`<#${monitoredChannelId}> is now being monitored for music uploads.`),
@@ -239,7 +325,7 @@ async function routeInteraction(
         response = handleRemoveLeaderboardChannel(interaction, db)
         break
       case 'addmonitoredchannel':
-        response = handleAddMonitoredChannel(interaction, db)
+        response = handleAddMonitoredChannel(interaction, db, token)
         break
       case 'removemonitoredchannel':
         response = handleRemoveMonitoredChannel(interaction, db)

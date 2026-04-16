@@ -1,7 +1,7 @@
 # tests-interactions.md
 
 **Test file:** `tests/interactions.test.ts`  
-**Tests:** 38
+**Tests:** 54
 
 ## Signature verification (2 tests)
 
@@ -51,7 +51,18 @@
 - Rejects if the current channel is not a leaderboard channel.
 - Adds the provided channel to `monitored_channels` linked to the current leaderboard channel.
 - Is idempotent — adding the same channel again does not error.
-- Rejects linking a different monitored channel when this leaderboard channel already has one.
+- Allows linking a different monitored channel when this leaderboard channel already has one (many-to-many).
+
+## `/addmonitoredchannel` recovery + leaderboard refresh (6 tests)
+
+Tests for `recoverAndRefreshLeaderboard` — the fire-and-forget function called after adding a monitored channel.
+
+- Calls `fetchMessagesAfter` for the newly added monitored channel.
+- Posts the leaderboard to the leaderboard channel after recovery.
+- Does not re-post when leaderboard content hash is unchanged.
+- Deletes old leaderboard message before posting new one when hash changes.
+- Logs errors but does not throw when recovery fails.
+- Upserts `leaderboard_posts` after posting.
 
 ## `/removemonitoredchannel` (5 tests)
 
@@ -61,9 +72,22 @@
 - Removes the provided channel from `monitored_channels`.
 - Does not delete historical `user_stats` rows.
 
-## Interaction router (1 test)
+## Interaction router (2 tests)
 
 - Returns `400` for unknown command names.
+- Logs unknown command name as a warning.
+- Logs unknown interaction type as a warning.
+
+## Token format (1 test)
+
+- Passes the token with Bot prefix to Discord API calls.
+
+## Interaction logging (4 tests)
+
+- Logs ping received.
+- Logs command received and completed for `/leaderboard`.
+- Logs signature verified for valid requests.
+- Logs warning for missing signature headers.
 
 ## Test approach
 

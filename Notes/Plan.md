@@ -1,116 +1,73 @@
-# Plan: Many-to-Many Monitored/Leaderboard Channel Relationship
+# Plan: Recovery + Leaderboard Display After `/addmonitoredchannel`
 
-## Problem
+## Goal
 
-The `monitored_channels` table enforces two constraints that limit the relationship to one-to-one:
+When a user runs `/addmonitoredchannel`, after adding the channel to the `monitored_channels` table, the bot should:
 
-1. `channel_id TEXT PRIMARY KEY` — a monitored channel can only appear in one row (linked to one leaderboard)
-2. `leaderboard_channel_id TEXT NOT NULL UNIQUE` — a leaderboard channel can only link to one monitored channel
+1. Run a recovery pass for the newly added monitored channel (backfill historical messages).
+2. Build and post/update the leaderboard in the leaderboard channel (same logic as `runScheduledWork`).
 
-This causes a silent failure when:
-- Leaderboard #a monitors channel #a (row inserted)
-- Leaderboard #b tries to also monitor channel #a → `ON CONFLICT(channel_id) DO NOTHING` silently skips the insert
-- `/leaderboard` in #b returns "No monitored channel is linked…"
-
-The desired behavior is **many-to-many**: one leaderboard channel can monitor multiple monitored channels, and one monitored channel can feed multiple leaderboard channels.
-
-## Schema Change
-
-### `monitored_channels` table (before)
-
-```sql
-CREATE TABLE IF NOT EXISTS monitored_channels (
-    channel_id TEXT PRIMARY KEY,
-    guild_id TEXT NOT NULL,
-    leaderboard_channel_id TEXT NOT NULL UNIQUE
-        REFERENCES leaderboard_channels(channel_id) ON DELETE CASCADE,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### `monitored_channels` table (after)
-
-```sql
-CREATE TABLE IF NOT EXISTS monitored_channels (
-    channel_id TEXT NOT NULL,
-    guild_id TEXT NOT NULL,
-    leaderboard_channel_id TEXT NOT NULL
-        REFERENCES leaderboard_channels(channel_id) ON DELETE CASCADE,
-    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (channel_id, leaderboard_channel_id)
-);
-```
-
-Key changes:
-- PK becomes composite `(channel_id, leaderboard_channel_id)` — allows the same monitored channel to appear in multiple rows (one per leaderboard)
-- UNIQUE constraint on `leaderboard_channel_id` is **removed** — allows a leaderboard to link to multiple monitored channels
-
-## Migration
-
-SQLite does not support `ALTER TABLE ... DROP CONSTRAINT` or `ALTER TABLE ... ALTER COLUMN`. The migration must:
-
-1. Create the new table under a temporary name
-2. Copy existing rows
-3. Drop the old table
-4. Rename the new table
-
-This should be done in a transaction in `src/index.ts` at startup, after the schema is initialized but before normal operation.
+Currently `handleAddMonitoredChannel` is synchronous — it inserts the DB row and returns an ephemeral confirmation. It needs to become async, trigger recovery, then refresh the leaderboard post.
 
 ## Code Changes
 
-### 1. `src/db/schema.sql`
+### 1. `src/handlers/interactions.ts` — `handleAddMonitoredChannel`
 
-Update the `monitored_channels` DDL as shown above.
+- Change signature from `(interaction, db): Response` to `(interaction, db, token): Response`.
+- After the successful `addMonitoredChannel` DB call:
+  1. **Fire-and-forget**: kick off an async IIFE that:
+     a. Calls `recoverChannel(db, token, monitoredChannelId)` to backfill messages.
+     b. Builds and posts/updates the leaderboard (same logic as `runScheduledWork`):
+        - Get all monitored channels for this leaderboard via `getMonitoredChannelsByLeaderboard`.
+        - For each, call `getLeaderboard` to get rows.
+        - Format with `formatLeaderboard` / `formatMultiChannelLeaderboard`.
+        - Compute `hashContent`, compare with existing `getLeaderboardPost`.
+        - If changed: delete old message (if any) via `deleteMessage`, post new via `sendMessage`, upsert `leaderboard_posts`.
+     c. Logs errors but does not throw (fire-and-forget).
+  2. **Immediately** return the ephemeral confirmation message (no awaiting recovery/leaderboard).
+- Update the `case 'addmonitoredchannel'` in `routeInteraction` to pass `token`.
 
-### 2. `src/db/queries.ts`
+### 2. `src/handlers/interactions.ts` — imports
 
-- **`addMonitoredChannel`**: Change conflict clause from `ON CONFLICT(channel_id) DO NOTHING` to `ON CONFLICT(channel_id, leaderboard_channel_id) DO NOTHING`.
-- **`deleteMonitoredChannel`**: Change signature to accept both `channelId` and `leaderboardChannelId`. Update SQL to `DELETE FROM monitored_channels WHERE channel_id = ? AND leaderboard_channel_id = ?`.
-- **`getMonitoredChannelByLeaderboard`** → rename to **`getMonitoredChannelsByLeaderboard`** (plural): Return `MonitoredChannel[]` instead of `MonitoredChannel | null`. Change SQL to return all rows for the leaderboard channel.
-- **`getLeaderboard`**: No signature change needed. It already accepts a single `channelId`. Callers will invoke it once per linked monitored channel.
+- Add imports for: `recoverChannel` from `services/recovery.js`, `hashContent` from `services/leaderboard.js`, `sendMessage`, `deleteMessage` from `services/discord.js`, `getLeaderboardPost`, `upsertLeaderboardPost`, `deleteLeaderboardPost` from `db/queries.js`.
 
-### 3. `src/handlers/interactions.ts`
+### 3. Tests — `tests/interactions.test.ts`
 
-- **`/addmonitoredchannel`**: Remove the guard that rejects adding a monitored channel when the leaderboard already has a different one linked. The command should now allow adding multiple monitored channels to a single leaderboard.
-- **`/removemonitoredchannel`**: Must be run from a leaderboard channel (add validation). Pass both `monitoredChannelId` and `leaderboardChannelId` (the current channel) to `deleteMonitoredChannel`, so only the specific link is removed — not all links for that monitored channel across every leaderboard.
-- **`/leaderboard`**: Update to call `getMonitoredChannelsByLeaderboard` (plural). If the result is an empty array, show the "no monitored channel linked" message. Otherwise, for each linked monitored channel, call `getLeaderboard` and `formatLeaderboard` individually, then concatenate all sections into one response. Each section names its monitored channel.
+- Existing `/addmonitoredchannel` tests need `global.fetch` mocked since `recoverChannel` calls `fetchMessagesAfter` (which uses `fetch`).
+- New tests:
+  - Recovery is called for the newly added monitored channel.
+  - Leaderboard is posted to the leaderboard channel after recovery.
+  - Leaderboard is not re-posted when content hash is unchanged.
+  - Old leaderboard message is deleted before posting a new one.
+  - Recovery failure doesn't prevent the add from succeeding (channel is still added, warning returned).
+  - Ephemeral response confirms the channel was added.
 
-### 4. `src/handlers/scheduled.ts`
+### 4. No schema changes required.
 
-- **`runScheduledWork`**: For each leaderboard channel, call `getMonitoredChannelsByLeaderboard` (plural). If empty, handle the orphan-post case as before. Otherwise, for each linked monitored channel, call `getLeaderboard` and `formatLeaderboard` individually, then concatenate all sections into one message for posting.
+### 5. Wiki updates
 
-### 5. `src/types.ts`
-
-- No changes to `MonitoredChannel` type itself. Update any function signatures that change (e.g., `deleteMonitoredChannel` params).
-
-### 6. `src/services/leaderboard.ts`
-
-- `formatLeaderboard` already accepts a channel name and rows. No merge function needed — each monitored channel gets its own call to `formatLeaderboard`.
-- Add a `formatMultiChannelLeaderboard(sections: { channelName: string, rows: LeaderboardRow[] }[])` helper (or have callers concatenate `formatLeaderboard` outputs) to combine multiple sections into one message.
+- Update `handler-interactions.md` to document the new async behavior of `/addmonitoredchannel`.
+- Update `log.md` with the change.
 
 ## Tasks
 
-- [ ] **1. Write migration** in `src/index.ts` to convert existing `monitored_channels` to the new schema at startup.
-- [ ] **2. Update `src/db/schema.sql`** with the new DDL.
-- [ ] **3. Update `src/db/queries.ts`** — `addMonitoredChannel`, `deleteMonitoredChannel`, `getMonitoredChannelsByLeaderboard`.
-- [ ] **4. Update `src/services/leaderboard.ts`** — add multi-section formatting (concatenate individual `formatLeaderboard` outputs).
-- [ ] **5. Update `src/handlers/interactions.ts`** — `/addmonitoredchannel`, `/removemonitoredchannel`, `/leaderboard`.
-- [ ] **6. Update `src/handlers/scheduled.ts`** — `runScheduledWork` leaderboard refresh loop.
-- [ ] **7. Write/update unit tests** (`tests/`) for all changed functions.
-- [ ] **8. Write/update e2e tests** (`e2e-tests/`) for multi-channel scenarios.
-- [ ] **9. Run all tests** and confirm they pass.
-- [ ] **10. Update wiki** to reflect the new schema and behavior.
+- [x] **1. Plan tests** — design new and modified tests for the `/addmonitoredchannel` changes.
+- [x] **2. Write failing tests** (Red) — add new tests to `tests/interactions.test.ts`.
+- [x] **3. Implement changes** (Green) — update `handleAddMonitoredChannel` in `src/handlers/interactions.ts`.
+- [x] **4. Run all tests** — confirm both `tests/` and `e2e-tests/` pass (366 tests, 21 files).
+- [x] **5. Update wiki** — reflect changes in `handler-interactions.md`, `tests-interactions.md`, and `log.md`.
 
 ## Pitfalls
 
-- **Migration safety**: The migration must be idempotent — if the new schema already exists (PK is composite), skip the migration. Check by inspecting `PRAGMA table_info(monitored_channels)` or catching the conflict.
-- **Multi-section output**: When a leaderboard channel monitors multiple channels, the posted message contains one section per monitored channel. Each section names its channel and shows stats from that channel only — no cross-channel merging. Discord message length limits (2000 chars) may become a concern with many monitored channels; consider truncation or splitting if needed.
-- **`/removemonitoredchannel` scope change**: Currently removes a monitored channel globally. After the fix, it only removes the link from the current leaderboard channel. Users may need to run the command from each leaderboard channel to fully unlink a monitored channel. This is the correct behavior — each leaderboard manages its own monitoring links independently.
-- **Recovery**: `recoverAllChannels` iterates `getMonitoredChannels()` which returns all rows. With multiple rows per monitored channel, recovery must deduplicate so it doesn't recover the same channel multiple times. The simplest fix: collect unique `channelId` values before iterating.
-- **`isMonitoredChannel`**: Still queries `WHERE channel_id = ?`, which works correctly with the composite PK (returns true if any row matches).
+- **Discord interaction timeout**: Discord expects an interaction response within 3 seconds. Recovery + leaderboard posting may take longer for channels with large history. Consider whether to return the ephemeral response immediately and do recovery/leaderboard asynchronously (fire-and-forget), or accept the timeout risk for small channels.
+  - The current `runScheduledWork` already does recovery + posting synchronously, so the pattern exists. For `/addmonitoredchannel`, a single channel recovery should be fast unless the channel has very long history.
+  - If timeout is a concern, we could return the ephemeral message first and run recovery/leaderboard in a fire-and-forget pattern (matching `setupGatewayHandler`'s approach).
+- **Rate limits**: `recoverChannel` pages through Discord API messages. The 1100ms delay in `discordFetch` means recovery of a channel with thousands of messages will take a while. This strengthens the case for fire-and-forget.
+- **Existing test mocking**: Current tests for `/addmonitoredchannel` don't mock `fetch`. The handler becoming async and calling Discord APIs means tests must mock `fetch` to avoid real HTTP calls.
 
 ## Assumptions
 
-- The underlying `user_stats` table and its per-channel scoping remain unchanged.
-- Stats are never merged across channels, even for display. Each monitored channel gets its own leaderboard section.
-- Existing data is preserved through the migration — all current links remain intact.
+- Recovery + leaderboard posting happen asynchronously (fire-and-forget) after returning the interaction response. This avoids Discord's 3-second interaction timeout.
+- The ephemeral response confirms the add; recovery/leaderboard happen in the background.
+- Errors in the fire-and-forget path are logged but do not affect the user-facing response.
+- No database schema changes are needed.

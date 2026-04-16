@@ -10,9 +10,12 @@ import {
   getMonitoredChannels,
   getMonitoredChannelsByLeaderboard,
   upsertUserStats,
+  getLeaderboardPost,
+  upsertLeaderboardPost,
 } from '../src/db/queries.js'
 import type { Database as DatabaseType, DiscordInteraction } from '../src/types.js'
 import { logger } from '../src/utils/logger.js'
+import { _resetRateLimit } from '../src/services/discord.js'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf8')
 
@@ -517,12 +520,24 @@ describe('/addmonitoredchannel', () => {
 
   beforeEach(() => {
     db = makeDb()
+    _resetRateLimit()
     upsertLeaderboardChannel(db, {
       channelId: LC_ID,
       guildId: GUILD_ID,
       channelName: 'leaderboard',
       addedByUserId: ADMIN_USER_ID,
     })
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-posted' }), { status: 200 })
+      if (opts?.method === 'DELETE') return new Response(null, { status: 204 })
+      return new Response('{}', { status: 200 })
+    }) as any
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('rejects interactions with no member', async () => {
@@ -617,6 +632,179 @@ describe('/addmonitoredchannel', () => {
     expect(res.status).toBe(200)
     const monitored = getMonitoredChannelsByLeaderboard(db, LC_ID)
     expect(monitored.value!.length).toBe(2)
+  })
+})
+
+// ─── 9.6b /addmonitoredchannel recovery + leaderboard refresh ───────────────
+
+import { recoverAndRefreshLeaderboard } from '../src/handlers/interactions.js'
+
+describe('/addmonitoredchannel recovery + leaderboard refresh', () => {
+  let db: DatabaseType
+
+  beforeEach(() => {
+    db = makeDb()
+    _resetRateLimit()
+    upsertLeaderboardChannel(db, {
+      channelId: LC_ID,
+      guildId: GUILD_ID,
+      channelName: 'leaderboard',
+      addedByUserId: ADMIN_USER_ID,
+    })
+    addMonitoredChannel(db, {
+      channelId: MC_ID,
+      guildId: GUILD_ID,
+      leaderboardChannelId: LC_ID,
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('calls fetchMessagesAfter for the newly added monitored channel', async () => {
+    const fetchMock = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
+      return new Response('{}', { status: 200 })
+    })
+    global.fetch = fetchMock as any
+
+    await recoverAndRefreshLeaderboard(db, TOKEN, MC_ID, LC_ID)
+
+    const recoveryUrls = fetchMock.mock.calls
+      .filter(([, opts]) => (opts as RequestInit)?.method === 'GET')
+      .map(([url]) => String(url))
+    expect(recoveryUrls.some((u) => u.includes(MC_ID) && u.includes('messages?after='))).toBe(true)
+  })
+
+  it('posts the leaderboard to the leaderboard channel after recovery', async () => {
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'user-1',
+      username: 'alice',
+      lastMusicPostAt: Date.now(),
+      runCount: 3,
+      highestRunSeen: 3,
+    })
+
+    let postedTo = ''
+    let postedContent = ''
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      const urlStr = String(url)
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST') {
+        const m = urlStr.match(/channels\/([^/]+)\/messages/)
+        if (m?.[1]) postedTo = m[1]
+        const body = JSON.parse(opts?.body as string)
+        postedContent = body.content
+        return new Response(JSON.stringify({ id: 'msg-lb' }), { status: 200 })
+      }
+      return new Response('{}', { status: 200 })
+    }) as any
+
+    await recoverAndRefreshLeaderboard(db, TOKEN, MC_ID, LC_ID)
+
+    expect(postedTo).toBe(LC_ID)
+    expect(postedContent).toContain('alice')
+  })
+
+  it('does not re-post when leaderboard content hash is unchanged', async () => {
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
+      return new Response('{}', { status: 200 })
+    }) as any
+
+    // First call posts the leaderboard
+    await recoverAndRefreshLeaderboard(db, TOKEN, MC_ID, LC_ID)
+    const firstPost = getLeaderboardPost(db, LC_ID)
+    expect(firstPost.value).not.toBeNull()
+
+    _resetRateLimit()
+    const fetchMock2 = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-2' }), { status: 200 })
+      return new Response('{}', { status: 200 })
+    })
+    global.fetch = fetchMock2 as any
+
+    // Second call should skip posting since hash is unchanged
+    await recoverAndRefreshLeaderboard(db, TOKEN, MC_ID, LC_ID)
+    const postCalls = fetchMock2.mock.calls.filter(([, opts]) => (opts as RequestInit)?.method === 'POST')
+    expect(postCalls.length).toBe(0)
+  })
+
+  it('deletes old leaderboard message before posting new one when hash changes', async () => {
+    upsertLeaderboardPost(db, {
+      channelId: LC_ID,
+      messageId: 'old-msg',
+      contentHash: 'stale-hash',
+    })
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'user-1',
+      username: 'alice',
+      lastMusicPostAt: Date.now(),
+      runCount: 2,
+      highestRunSeen: 2,
+    })
+
+    const callOrder: string[] = []
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'DELETE') {
+        callOrder.push('delete')
+        return new Response(null, { status: 204 })
+      }
+      if (opts?.method === 'POST') {
+        callOrder.push('post')
+        return new Response(JSON.stringify({ id: 'new-msg' }), { status: 200 })
+      }
+      return new Response('{}', { status: 200 })
+    }) as any
+
+    await recoverAndRefreshLeaderboard(db, TOKEN, MC_ID, LC_ID)
+
+    expect(callOrder).toContain('delete')
+    expect(callOrder).toContain('post')
+    expect(callOrder.indexOf('delete')).toBeLessThan(callOrder.indexOf('post'))
+  })
+
+  it('logs errors but does not throw when recovery fails', async () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn(async () => new Response('Server Error', { status: 500 })) as any
+
+    await expect(recoverAndRefreshLeaderboard(db, TOKEN, MC_ID, LC_ID)).resolves.not.toThrow()
+    expect(errorSpy).toHaveBeenCalled()
+  })
+
+  it('upserts leaderboard_posts after posting', async () => {
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'user-1',
+      username: 'alice',
+      lastMusicPostAt: Date.now(),
+      runCount: 1,
+      highestRunSeen: 1,
+    })
+
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-posted' }), { status: 200 })
+      return new Response('{}', { status: 200 })
+    }) as any
+
+    await recoverAndRefreshLeaderboard(db, TOKEN, MC_ID, LC_ID)
+
+    const post = getLeaderboardPost(db, LC_ID)
+    expect(post.isOk).toBe(true)
+    expect(post.value?.messageId).toBe('msg-posted')
+    expect(post.value?.contentHash).toBeTruthy()
   })
 })
 

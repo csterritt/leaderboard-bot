@@ -263,3 +263,24 @@ Changes:
 - Wiki: updated `entry-point.md`, `tests-index.md`, `e2e-scheduled.md` to reflect the new startup behavior.
 
 All 354 tests pass (21 test files).
+
+## [2026-04-16] feature | Recovery + leaderboard refresh after `/addmonitoredchannel`
+
+Added fire-and-forget recovery + leaderboard posting when a monitored channel is added via `/addmonitoredchannel`.
+
+**Problem:** Previously, running `/addmonitoredchannel` only inserted the DB row. Historical messages in the newly monitored channel were not recovered until the next hourly `runScheduledWork` cycle, and the leaderboard was not updated until then either.
+
+**Fix:** After inserting the monitored channel row, `handleAddMonitoredChannel` now fires off `recoverAndRefreshLeaderboard` (fire-and-forget):
+
+1. Runs `recoverChannel` to backfill historical messages for the newly added channel.
+2. Rebuilds the leaderboard for the parent leaderboard channel (same logic as `runScheduledWork`): get all monitored channels, format content, compute hash, skip if unchanged, delete old post, send new post, upsert `leaderboard_posts`.
+3. All errors are caught and logged — never affects the user-facing ephemeral response.
+4. The ephemeral response is returned immediately (no Discord interaction timeout risk).
+
+Changes:
+
+- `src/handlers/interactions.ts`: Added `recoverAndRefreshLeaderboard` (exported for testing). Updated `handleAddMonitoredChannel` to accept `token` parameter and call `recoverAndRefreshLeaderboard` as fire-and-forget. Added imports for `recoverChannel`, `hashContent`, `sendMessage`, `deleteMessage`, `getLeaderboardPost`, `upsertLeaderboardPost`.
+- `tests/interactions.test.ts`: Added 6 new tests for `recoverAndRefreshLeaderboard`. Updated existing `/addmonitoredchannel` tests with `global.fetch` mock and `_resetRateLimit` cleanup.
+- Wiki: Updated `handler-interactions.md`, `tests-interactions.md`, `log.md`.
+
+All 366 tests pass (21 test files).
