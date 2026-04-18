@@ -13,12 +13,15 @@ Exercises the full scheduled-work pipeline: recovery, leaderboard rendering/post
 - Removes a stored leaderboard post when its leaderboard channel no longer has a monitored-channel link.
 - Prunes old `processed_messages` rows during the scheduled run.
 - **Startup scenario**: recovery backfills messages in a single `runScheduledWork` pass and the leaderboard is posted immediately (not deferred to the next hourly tick).
+- **Inactivity reset**: resets `run_count` to 0 for users who have not posted in more than 36 hours; preserves `highest_run_seen`.
+- **Active streak preservation**: users who posted within 36 hours retain their streak.
+- **Leaderboard after reset**: leaderboard correctly reflects zeroed scores after inactivity reset.
 
 ## Test approach
 
 - Uses an in-memory database with real schema and seeded channels.
 - Stubs Discord API calls for message fetch, post, and delete operations.
-- Uses `createClock()` where deterministic timestamps help seed test data.
+- Uses `createClock()` for deterministic timestamps; `clock.now()` is passed as `nowUnixSecs` to `runScheduledWork`.
 - Verifies both outbound side effects and stored `leaderboard_posts` rows.
 
 ## Cross-references

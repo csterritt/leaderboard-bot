@@ -1,73 +1,61 @@
-# Plan: Recovery + Leaderboard Display After `/addmonitoredchannel`
+# Implementation Plan
 
-## Goal
+## Change 1: Enable WAL Journal Mode
 
-When a user runs `/addmonitoredchannel`, after adding the channel to the `monitored_channels` table, the bot should:
+- [x] In `src/index.ts`, add `db.exec('PRAGMA journal_mode = WAL')` immediately after opening the database, before `PRAGMA foreign_keys = ON`.
+- [x] Add a unit test in `tests/` verifying the database is in WAL mode after initialization.
 
-1. Run a recovery pass for the newly added monitored channel (backfill historical messages).
-2. Build and post/update the leaderboard in the leaderboard channel (same logic as `runScheduledWork`).
+## Change 2: Hourly Inactivity Reset
 
-Currently `handleAddMonitoredChannel` is synchronous — it inserts the DB row and returns an ephemeral confirmation. It needs to become async, trigger recovery, then refresh the leaderboard post.
+### New DB query: `resetInactiveStreaks`
 
-## Code Changes
+- [x] In `src/db/queries.ts`, add a new exported function `resetInactiveStreaks(db, nowUnixSecs)` that executes:
+  ```sql
+  UPDATE user_stats
+  SET run_count = 0, updated_at = CURRENT_TIMESTAMP
+  WHERE last_music_post_at IS NOT NULL
+    AND last_music_post_at <= ? - 129600
+    AND run_count > 0
+  ```
+  The second parameter is `nowUnixSecs - THIRTY_SIX_HOURS_SECS` (i.e., `nowUnixSecs - 129600`).
+  `highest_run_seen` is intentionally left unchanged.
+  Follows the existing `withRetry` / `toResult` / `Result<void, Error>` pattern.
 
-### 1. `src/handlers/interactions.ts` — `handleAddMonitoredChannel`
+### Wire into scheduled work
 
-- Change signature from `(interaction, db): Response` to `(interaction, db, token): Response`.
-- After the successful `addMonitoredChannel` DB call:
-  1. **Fire-and-forget**: kick off an async IIFE that:
-     a. Calls `recoverChannel(db, token, monitoredChannelId)` to backfill messages.
-     b. Builds and posts/updates the leaderboard (same logic as `runScheduledWork`):
-        - Get all monitored channels for this leaderboard via `getMonitoredChannelsByLeaderboard`.
-        - For each, call `getLeaderboard` to get rows.
-        - Format with `formatLeaderboard` / `formatMultiChannelLeaderboard`.
-        - Compute `hashContent`, compare with existing `getLeaderboardPost`.
-        - If changed: delete old message (if any) via `deleteMessage`, post new via `sendMessage`, upsert `leaderboard_posts`.
-     c. Logs errors but does not throw (fire-and-forget).
-  2. **Immediately** return the ephemeral confirmation message (no awaiting recovery/leaderboard).
-- Update the `case 'addmonitoredchannel'` in `routeInteraction` to pass `token`.
+- [x] In `src/handlers/scheduled.ts`, import `resetInactiveStreaks`.
+- [x] `runScheduledWork` gains an optional `nowUnixSecs` parameter (defaulting to `Date.now()`) for testability.
+- [x] Call `resetInactiveStreaks(db, now)` **after** recovery and **before** the leaderboard refresh loop.
+- [x] Log `[scheduled] resetting inactive streaks` before the call.
 
-### 2. `src/handlers/interactions.ts` — imports
+### Update entry point
 
-- Add imports for: `recoverChannel` from `services/recovery.js`, `hashContent` from `services/leaderboard.js`, `sendMessage`, `deleteMessage` from `services/discord.js`, `getLeaderboardPost`, `upsertLeaderboardPost`, `deleteLeaderboardPost` from `db/queries.js`.
+- [x] In `src/index.ts`, WAL pragma added. No clock instance needed — `runScheduledWork` defaults to `Date.now()` at runtime.
 
-### 3. Tests — `tests/interactions.test.ts`
+### Tests
 
-- Existing `/addmonitoredchannel` tests need `global.fetch` mocked since `recoverChannel` calls `fetchMessagesAfter` (which uses `fetch`).
-- New tests:
-  - Recovery is called for the newly added monitored channel.
-  - Leaderboard is posted to the leaderboard channel after recovery.
-  - Leaderboard is not re-posted when content hash is unchanged.
-  - Old leaderboard message is deleted before posting a new one.
-  - Recovery failure doesn't prevent the add from succeeding (channel is still added, warning returned).
-  - Ephemeral response confirms the channel was added.
+- [x] **Unit tests** (`tests/`):
+  - `resetInactiveStreaks` correctly zeros `run_count` for rows older than 36 h.
+  - `resetInactiveStreaks` does not touch rows within 36 h.
+  - `resetInactiveStreaks` does not touch rows with `run_count` already 0.
+  - `resetInactiveStreaks` preserves `highest_run_seen`.
+  - `resetInactiveStreaks` does not touch rows where `last_music_post_at` is null.
+  - `resetInactiveStreaks` does not touch rows at exactly the 36 h boundary.
+  - `runScheduledWork` calls `resetInactiveStreaks` after recovery and before leaderboard posting.
 
-### 4. No schema changes required.
-
-### 5. Wiki updates
-
-- Update `handler-interactions.md` to document the new async behavior of `/addmonitoredchannel`.
-- Update `log.md` with the change.
-
-## Tasks
-
-- [x] **1. Plan tests** — design new and modified tests for the `/addmonitoredchannel` changes.
-- [x] **2. Write failing tests** (Red) — add new tests to `tests/interactions.test.ts`.
-- [x] **3. Implement changes** (Green) — update `handleAddMonitoredChannel` in `src/handlers/interactions.ts`.
-- [x] **4. Run all tests** — confirm both `tests/` and `e2e-tests/` pass (366 tests, 21 files).
-- [x] **5. Update wiki** — reflect changes in `handler-interactions.md`, `tests-interactions.md`, and `log.md`.
-
-## Pitfalls
-
-- **Discord interaction timeout**: Discord expects an interaction response within 3 seconds. Recovery + leaderboard posting may take longer for channels with large history. Consider whether to return the ephemeral response immediately and do recovery/leaderboard asynchronously (fire-and-forget), or accept the timeout risk for small channels.
-  - The current `runScheduledWork` already does recovery + posting synchronously, so the pattern exists. For `/addmonitoredchannel`, a single channel recovery should be fast unless the channel has very long history.
-  - If timeout is a concern, we could return the ephemeral message first and run recovery/leaderboard in a fire-and-forget pattern (matching `setupGatewayHandler`'s approach).
-- **Rate limits**: `recoverChannel` pages through Discord API messages. The 1100ms delay in `discordFetch` means recovery of a channel with thousands of messages will take a while. This strengthens the case for fire-and-forget.
-- **Existing test mocking**: Current tests for `/addmonitoredchannel` don't mock `fetch`. The handler becoming async and calling Discord APIs means tests must mock `fetch` to avoid real HTTP calls.
+- [x] **E2E tests** (`e2e-tests/`):
+  - A user who hasn't posted in > 36 h has `run_count = 0` after scheduled work.
+  - A user who posted within 36 h retains their streak after scheduled work.
+  - After reset, leaderboard correctly reflects the zeroed score.
 
 ## Assumptions
 
-- Recovery + leaderboard posting happen asynchronously (fire-and-forget) after returning the interaction response. This avoids Discord's 3-second interaction timeout.
-- The ephemeral response confirms the add; recovery/leaderboard happen in the background.
-- Errors in the fire-and-forget path are logged but do not affect the user-facing response.
-- No database schema changes are needed.
+- **No schema changes** — both features operate on existing tables and columns.
+- The 36-hour threshold for inactivity reset matches the existing `THIRTY_SIX_HOURS_SECS` constant. No new constant is needed.
+- The clock facility is already available and used in e2e tests, so threading it into `runScheduledWork` is straightforward.
+
+## Pitfalls
+
+- **WAL + `bun:sqlite`**: WAL mode is well-supported by bun:sqlite. The pragma must be set before any schema operations to take effect for the session.
+- **Test isolation**: E2E tests that manipulate the clock must reset it after each test to avoid cross-contamination.
+- **Threshold boundary**: The reset uses a strict `>` 36-hour comparison (i.e., `last_music_post_at <= now - 129600`), matching the existing streak logic where exactly 36 h is still within the "increment" window.

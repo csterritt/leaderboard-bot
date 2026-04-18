@@ -478,6 +478,50 @@ describe('runScheduledWork', () => {
     expect(postedContent).toContain('bob')
   })
 
+  it('resets inactive streaks after recovery and before leaderboard posting', async () => {
+    seedLeaderboardChannel(db)
+    const NOW = Math.floor(Date.now() / 1000)
+    const THIRTY_SIX_HOURS = 129_600
+
+    // Seed a user whose last post is more than 36 h ago
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'stale-user',
+      username: 'stale-user',
+      lastMusicPostAt: NOW - THIRTY_SIX_HOURS - 1,
+      runCount: 5,
+      highestRunSeen: 10,
+    })
+
+    // Seed a user whose last post is within 36 h
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'active-user',
+      username: 'active-user',
+      lastMusicPostAt: NOW - 1000,
+      runCount: 3,
+      highestRunSeen: 3,
+    })
+
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'GET') return new Response(JSON.stringify([]), { status: 200 })
+      if (opts?.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 })
+      return new Response('{}', { status: 200 })
+    }) as any
+
+    const result = await runScheduledWork(db, TOKEN)
+    expect(result.isOk).toBe(true)
+
+    const { getUserStats } = await import('../src/db/queries.js')
+    const stale = getUserStats(db, MC_ID, 'stale-user')
+    expect(stale.value?.runCount).toBe(0)
+    expect(stale.value?.highestRunSeen).toBe(10)
+
+    const active = getUserStats(db, MC_ID, 'active-user')
+    expect(active.value?.runCount).toBe(3)
+  })
+
   it('logs pruned processed messages', async () => {
     seedLeaderboardChannel(db)
 

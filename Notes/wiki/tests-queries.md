@@ -12,8 +12,9 @@ Tests for `src/db/queries.ts`. Each test suite creates a fresh in-memory bun:sql
 - **getRecoveryState / upsertRecoveryState**: null for unknown; round-trip `last_processed_message_id`; `updated_at` set on insert and refreshed.
 - **getMonitoredChannels / addMonitoredChannel / deleteMonitoredChannel / isMonitoredChannel / getMonitoredChannelByLeaderboard**: empty initially; insert; idempotent re-add; reject second monitored channel for same leaderboard; delete; boolean check; null / row lookups.
 - **claimProcessedMessage / hasProcessedMessage / pruneProcessedMessages**: first claim succeeds (`true`); second claim is no-op (`false`); `hasProcessedMessage` true after claim; prune deletes old rows; prune preserves new rows.
+- **resetInactiveStreaks**: zeros `run_count` for rows older than 36 h; preserves rows within 36 h; skips rows already at 0; preserves `highest_run_seen`; skips null `last_music_post_at`; preserves rows at exactly the 36 h boundary.
 
-**37 tests, all passing.**
+**44 tests, all passing.**
 
 ## Related pages
 

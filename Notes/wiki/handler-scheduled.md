@@ -8,13 +8,14 @@ Performs all periodic (hourly) work: recovery of missed messages, leaderboard re
 
 ## Functions
 
-### `runScheduledWork(db, token): Promise<Result<void, Error>>`
+### `runScheduledWork(db, token, nowUnixSecs?): Promise<Result<void, Error>>`
 
 Orchestrates the scheduled work pipeline in order:
 
 1. **No-op guard** — fetches all `leaderboard_channels`; returns immediately if none are configured.
 2. **Recovery** — calls `recoverAllChannels(db, token)` to backfill any missed gateway messages.
-3. **Leaderboard refresh** — for each leaderboard channel:
+3. **Inactivity reset** — calls `resetInactiveStreaks(db, now)` to set `run_count = 0` for all `user_stats` rows with `last_music_post_at` more than 36 hours ago. Uses `nowUnixSecs` if provided, otherwise `Math.floor(Date.now() / 1000)`.
+4. **Leaderboard refresh** — for each leaderboard channel:
    - Looks up all linked monitored channels via `getMonitoredChannelsByLeaderboard`.
    - If no linked monitored channels exist: deletes any stale leaderboard post (message + DB row) and continues.
    - Fetches leaderboard rows for each linked monitored channel via `getLeaderboard`.
@@ -25,11 +26,12 @@ Orchestrates the scheduled work pipeline in order:
    - **Deletes the previous message** via `deleteMessage` (404 is tolerated as success).
    - Posts the new leaderboard via `sendMessage`.
    - Upserts `leaderboard_posts(channel_id, message_id, content_hash)`.
-4. **Pruning** — calls `pruneProcessedMessages(db, PRUNE_THRESHOLD_DAYS)` (14 days) after all posting is done.
+5. **Pruning** — calls `pruneProcessedMessages(db, PRUNE_THRESHOLD_DAYS)` (14 days) after all posting is done.
 
 **Logging:**
 
 - `[scheduled] starting scheduled work` — on entry.
+- `[scheduled] resetting inactive streaks` — before inactivity reset.
 - `[scheduled] no leaderboard channels configured, skipping` — when no channels.
 - `[scheduled] found N leaderboard channel(s)` — channel count.
 - `[scheduled] processing leaderboard channel: <id> (<name>)` — per channel.
@@ -43,7 +45,8 @@ Orchestrates the scheduled work pipeline in order:
 
 ## Key Design Rules
 
-- Recovery always runs **before** any leaderboard posting.
+- Recovery always runs **before** inactivity reset and leaderboard posting.
+- Inactivity reset always runs **after** recovery and **before** leaderboard posting.
 - Pruning always runs **after** leaderboard posting.
 - Each leaderboard channel is processed independently — no row merging across channels.
 - Orphaned leaderboard channels (no linked monitored channel) have their stored post cleaned up.
@@ -54,6 +57,6 @@ Orchestrates the scheduled work pipeline in order:
 - Uses [`service-recovery.md`](service-recovery.md) — `recoverAllChannels`
 - Uses [`service-leaderboard.md`](service-leaderboard.md) — `formatLeaderboard`, `formatMultiChannelLeaderboard`, `hashContent`
 - Uses [`service-discord.md`](service-discord.md) — `sendMessage`, `deleteMessage`
-- Uses [`db-queries.md`](db-queries.md) — `getLeaderboardChannels`, `getMonitoredChannelsByLeaderboard`, `getLeaderboard`, `getLeaderboardPost`, `upsertLeaderboardPost`, `deleteLeaderboardPost`, `pruneProcessedMessages`
+- Uses [`db-queries.md`](db-queries.md) — `getLeaderboardChannels`, `getMonitoredChannelsByLeaderboard`, `getLeaderboard`, `getLeaderboardPost`, `upsertLeaderboardPost`, `deleteLeaderboardPost`, `pruneProcessedMessages`, `resetInactiveStreaks`
 - Uses [`constants.md`](constants.md) — `PRUNE_THRESHOLD_DAYS` (14)
 - Tests: [`tests-scheduled.md`](tests-scheduled.md)

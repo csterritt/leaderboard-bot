@@ -1,6 +1,6 @@
 # Tests for handlers/scheduled.ts
 
-**Test file:** `tests/scheduled.test.ts` (11 tests)
+**Test file:** `tests/scheduled.test.ts` (17 tests)
 
 ## Coverage
 
@@ -14,7 +14,13 @@
 - Deletes the previous leaderboard message before posting a new one (verified via call order)
 - Continues gracefully when message deletion returns 404
 - Posts a new leaderboard and upserts `leaderboard_posts` with correct `message_id` and `content_hash`
+- Resets inactive streaks (run_count → 0) after recovery and before leaderboard posting; preserves active users and `highest_run_seen`
+- Logs start and completion of scheduled work
+- Logs when leaderboard content is unchanged
+- Logs when leaderboard post is updated
+- Builds a combined multi-section post when a leaderboard channel monitors multiple channels
 - Prunes `processed_messages` rows older than 14 days after leaderboard posting
+- Logs pruned processed messages
 
 ## Related pages
 

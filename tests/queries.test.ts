@@ -24,6 +24,7 @@ import {
   claimProcessedMessage,
   hasProcessedMessage,
   pruneProcessedMessages,
+  resetInactiveStreaks,
 } from '../src/db/queries'
 
 const schema = readFileSync(join(import.meta.dirname, '../src/db/schema.sql'), 'utf-8')
@@ -600,5 +601,84 @@ describe('claimProcessedMessage / hasProcessedMessage / pruneProcessedMessages',
     pruneProcessedMessages(db, 14)
     const result = hasProcessedMessage(db, 'new-msg')
     expect(result.value).toBe(true)
+  })
+})
+
+describe('resetInactiveStreaks', () => {
+  const NOW = 1_700_200_000
+  const THIRTY_SIX_HOURS = 129_600
+
+  function seedUser(
+    db: DatabaseType,
+    opts: {
+      userId: string
+      lastMusicPostAt: number | null
+      runCount: number
+      highestRunSeen: number
+    },
+  ) {
+    upsertUserStats(db, {
+      channelId: CHANNEL_A,
+      userId: opts.userId,
+      username: opts.userId,
+      lastMusicPostAt: opts.lastMusicPostAt,
+      runCount: opts.runCount,
+      highestRunSeen: opts.highestRunSeen,
+    })
+  }
+
+  it('zeros run_count for rows where last_music_post_at is more than 36 h ago', () => {
+    const db = makeDb()
+    seedUser(db, { userId: 'old-user', lastMusicPostAt: NOW - THIRTY_SIX_HOURS - 1, runCount: 5, highestRunSeen: 10 })
+    const result = resetInactiveStreaks(db, NOW)
+    expect(result.isOk).toBe(true)
+    const stats = getUserStats(db, CHANNEL_A, 'old-user')
+    expect(stats.value?.runCount).toBe(0)
+  })
+
+  it('does not touch rows within 36 h', () => {
+    const db = makeDb()
+    seedUser(db, { userId: 'recent-user', lastMusicPostAt: NOW - THIRTY_SIX_HOURS + 1, runCount: 3, highestRunSeen: 5 })
+    const result = resetInactiveStreaks(db, NOW)
+    expect(result.isOk).toBe(true)
+    const stats = getUserStats(db, CHANNEL_A, 'recent-user')
+    expect(stats.value?.runCount).toBe(3)
+  })
+
+  it('does not touch rows with run_count already 0', () => {
+    const db = makeDb()
+    seedUser(db, { userId: 'zero-user', lastMusicPostAt: NOW - THIRTY_SIX_HOURS - 100, runCount: 0, highestRunSeen: 7 })
+    const result = resetInactiveStreaks(db, NOW)
+    expect(result.isOk).toBe(true)
+    const stats = getUserStats(db, CHANNEL_A, 'zero-user')
+    expect(stats.value?.runCount).toBe(0)
+    expect(stats.value?.highestRunSeen).toBe(7)
+  })
+
+  it('preserves highest_run_seen', () => {
+    const db = makeDb()
+    seedUser(db, { userId: 'best-user', lastMusicPostAt: NOW - THIRTY_SIX_HOURS - 1, runCount: 8, highestRunSeen: 15 })
+    resetInactiveStreaks(db, NOW)
+    const stats = getUserStats(db, CHANNEL_A, 'best-user')
+    expect(stats.value?.highestRunSeen).toBe(15)
+    expect(stats.value?.runCount).toBe(0)
+  })
+
+  it('does not touch rows where last_music_post_at is null', () => {
+    const db = makeDb()
+    seedUser(db, { userId: 'null-user', lastMusicPostAt: null, runCount: 0, highestRunSeen: 0 })
+    const result = resetInactiveStreaks(db, NOW)
+    expect(result.isOk).toBe(true)
+    const stats = getUserStats(db, CHANNEL_A, 'null-user')
+    expect(stats.value?.runCount).toBe(0)
+  })
+
+  it('does not touch rows at exactly the 36 h boundary', () => {
+    const db = makeDb()
+    seedUser(db, { userId: 'boundary-user', lastMusicPostAt: NOW - THIRTY_SIX_HOURS, runCount: 4, highestRunSeen: 4 })
+    const result = resetInactiveStreaks(db, NOW)
+    expect(result.isOk).toBe(true)
+    const stats = getUserStats(db, CHANNEL_A, 'boundary-user')
+    expect(stats.value?.runCount).toBe(4)
   })
 })

@@ -21,6 +21,7 @@ logger.log(`[startup] DATABASE_PATH=${DATABASE_PATH} PORT=${HTTP_PORT}`)
 
 logger.log('[startup] opening database')
 const db = new Database(DATABASE_PATH)
+db.exec('PRAGMA journal_mode = WAL')
 db.exec('PRAGMA foreign_keys = ON')
 const schema = readFileSync(join(import.meta.dirname, 'db/schema.sql'), 'utf8')
 db.exec(schema)

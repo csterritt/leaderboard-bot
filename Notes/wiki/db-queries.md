@@ -37,6 +37,10 @@ All exported database operations for the leaderboard bot. Every function follows
 - `isMonitoredChannel(db, channelId)` — `boolean` existence check (true if any row for this channel_id exists).
 - `getMonitoredChannelsByLeaderboard(db, leaderboardChannelId)` — all monitored channels linked to a leaderboard channel (returns `MonitoredChannel[]`, empty array if none).
 
+## Inactivity Reset
+
+- `resetInactiveStreaks(db, nowUnixSecs): Result<void, Error>` — sets `run_count = 0` (and refreshes `updated_at`) for all `user_stats` rows where `last_music_post_at` is non-null, more than 36 hours before `nowUnixSecs`, and `run_count > 0`. Does not modify `highest_run_seen`. Uses the hardcoded threshold `129_600` (36 hours in seconds).
+
 ## Processed Messages (Idempotency)
 
 - `claimProcessedMessage(db, { messageId, channelId })` — inserts with `ON CONFLICT DO NOTHING`; returns `true` if the row was inserted (first claim), `false` if already existed.

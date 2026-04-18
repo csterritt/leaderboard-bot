@@ -284,3 +284,26 @@ Changes:
 - Wiki: Updated `handler-interactions.md`, `tests-interactions.md`, `log.md`.
 
 All 366 tests pass (21 test files).
+
+## [2026-04-18] feature | WAL journal mode + hourly inactivity streak reset
+
+Added two features:
+
+1. **WAL journal mode** — `src/index.ts` now runs `PRAGMA journal_mode = WAL` immediately after opening the database, before `PRAGMA foreign_keys = ON`. Improves concurrent read performance.
+
+2. **Inactivity streak reset** — during each `runScheduledWork` cycle, after recovery and before leaderboard posting, the bot resets `run_count = 0` for all `user_stats` rows where `last_music_post_at` is non-null and more than 36 hours before the current time. `highest_run_seen` is preserved.
+
+Changes:
+
+- `src/index.ts`: added `PRAGMA journal_mode = WAL`.
+- `src/db/queries.ts`: added `resetInactiveStreaks(db, nowUnixSecs)` — new query using `withRetry`/`toResult` pattern.
+- `src/handlers/scheduled.ts`: added optional `nowUnixSecs` parameter to `runScheduledWork`; calls `resetInactiveStreaks` after recovery, before leaderboard refresh.
+- `tests/queries.test.ts`: 6 new tests for `resetInactiveStreaks` (zeros old rows, preserves recent, skips already-zero, preserves highest, skips null, boundary).
+- `tests/scheduled.test.ts`: 1 new test verifying reset runs after recovery and before posting.
+- `e2e-tests/scheduled/scheduled-work.test.ts`: 3 new e2e tests (stale user reset, active user preserved, leaderboard reflects reset). All e2e calls now pass `clock.now()` as `nowUnixSecs`.
+- Wiki: updated `overview.md`, `db-queries.md`, `handler-scheduled.md`, `entry-point.md`, `tests-queries.md`, `tests-scheduled.md`, `e2e-scheduled.md`, `index.md`.
+- `README.md`: updated features, tech stack, streak rules, and scheduled work sections.
+- `Notes/Architecture.md`: updated tech stack, scheduled work flow, and added WAL + Inactivity Reset sections.
+- `Notes/Plan.md`: written with all items checked off.
+
+All 376 tests pass (21 test files).

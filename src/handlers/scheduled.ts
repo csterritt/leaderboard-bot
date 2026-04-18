@@ -7,6 +7,7 @@ import {
   upsertLeaderboardPost,
   deleteLeaderboardPost,
   pruneProcessedMessages,
+  resetInactiveStreaks,
 } from '../db/queries.js'
 import { recoverAllChannels } from '../services/recovery.js'
 import { formatLeaderboard, formatMultiChannelLeaderboard, hashContent } from '../services/leaderboard.js'
@@ -20,6 +21,7 @@ import { logger } from '../utils/logger.js'
 export const runScheduledWork = async (
   db: Database,
   token: string,
+  nowUnixSecs?: number,
 ): Promise<Result<void, Error>> => {
   logger.log('[scheduled] starting scheduled work')
   const channelsResult = getLeaderboardChannels(db)
@@ -33,6 +35,11 @@ export const runScheduledWork = async (
   logger.log(`[scheduled] found ${channelsResult.value.length} leaderboard channel(s)`)
   const recoveryResult = await recoverAllChannels(db, token)
   if (!recoveryResult.isOk) return Result.err(recoveryResult.error)
+
+  logger.log('[scheduled] resetting inactive streaks')
+  const now = nowUnixSecs ?? Math.floor(Date.now() / 1000)
+  const resetResult = resetInactiveStreaks(db, now)
+  if (!resetResult.isOk) return Result.err(resetResult.error)
 
   for (const lc of channelsResult.value) {
     logger.log(`[scheduled] processing leaderboard channel: ${lc.channelId} (${lc.channelName})`)

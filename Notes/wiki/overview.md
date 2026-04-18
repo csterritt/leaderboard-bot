@@ -15,7 +15,7 @@ A Discord bot that:
 | Concern         | Choice                                                                |
 | --------------- | --------------------------------------------------------------------- |
 | Runtime         | Bun                                                                   |
-| Database        | bun:sqlite (Bun built-in synchronous SQLite3 driver)                  |
+| Database        | bun:sqlite (Bun built-in synchronous SQLite3 driver, WAL mode)        |
 | Discord library | discord.js (handles gateway, heartbeat, reconnect, resume)            |
 | Testing         | vitest via `bun --bun vitest run` with in-memory bun:sqlite databases |
 | Result type     | true-myth `Result<T, Error>`                                          |

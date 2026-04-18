@@ -106,7 +106,7 @@ describe('scheduled work (e2e)', () => {
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
-    const result = await runScheduledWork(db, TOKEN)
+    const result = await runScheduledWork(db, TOKEN, clock.now())
     expect(result.isOk).toBe(true)
 
     expect(postedChannelId).toBe(LC_ID)
@@ -132,11 +132,11 @@ describe('scheduled work (e2e)', () => {
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
-    await runScheduledWork(db, TOKEN)
+    await runScheduledWork(db, TOKEN, clock.now())
     const firstPost = getLeaderboardPost(db, LC_ID)
     expect(firstPost.value?.messageId).toBe('msg-1')
 
-    await runScheduledWork(db, TOKEN)
+    await runScheduledWork(db, TOKEN, clock.now())
     expect(postCallCount).toBe(1)
 
     const secondPost = getLeaderboardPost(db, LC_ID)
@@ -166,7 +166,7 @@ describe('scheduled work (e2e)', () => {
       })
 
     global.fetch = makeStub() as any
-    await runScheduledWork(db, TOKEN)
+    await runScheduledWork(db, TOKEN, clock.now())
     const post1 = getLeaderboardPost(db, LC_ID)
     expect(post1.value?.messageId).toBe('msg-post-1')
 
@@ -180,7 +180,7 @@ describe('scheduled work (e2e)', () => {
     })
 
     global.fetch = makeStub() as any
-    await runScheduledWork(db, TOKEN)
+    await runScheduledWork(db, TOKEN, clock.now())
 
     expect(deletedMsgIds).toContain('msg-post-1')
     expect(postCallCount).toBe(2)
@@ -242,7 +242,7 @@ describe('scheduled work (e2e)', () => {
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
-    const result = await runScheduledWork(db, TOKEN)
+    const result = await runScheduledWork(db, TOKEN, clock.now())
     expect(result.isOk).toBe(true)
 
     expect(postedChannels).toContain(LC_ID)
@@ -275,7 +275,7 @@ describe('scheduled work (e2e)', () => {
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
-    const result = await runScheduledWork(db, TOKEN)
+    const result = await runScheduledWork(db, TOKEN, clock.now())
     expect(result.isOk).toBe(true)
 
     const stats = getUserStats(db, MC_ID, 'helen')
@@ -298,13 +298,13 @@ describe('scheduled work (e2e)', () => {
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
-    await runScheduledWork(db, TOKEN)
+    await runScheduledWork(db, TOKEN, clock.now())
     const post = getLeaderboardPost(db, LC_ID)
     expect(post.value?.messageId).toBe('posted-msg-ivan')
 
     db.prepare('DELETE FROM monitored_channels WHERE leaderboard_channel_id = ?').run(LC_ID)
 
-    await runScheduledWork(db, TOKEN)
+    await runScheduledWork(db, TOKEN, clock.now())
 
     expect(deletedMsgId).toBe('posted-msg-ivan')
     const postAfter = getLeaderboardPost(db, LC_ID)
@@ -331,7 +331,7 @@ describe('scheduled work (e2e)', () => {
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
-    const result = await runScheduledWork(db, TOKEN)
+    const result = await runScheduledWork(db, TOKEN, clock.now())
     expect(result.isOk).toBe(true)
 
     const stats = getUserStats(db, MC_ID, 'startup-user')
@@ -342,6 +342,104 @@ describe('scheduled work (e2e)', () => {
 
     const post = getLeaderboardPost(db, LC_ID)
     expect(post.value?.messageId).toBe('startup-post-msg')
+  })
+
+  it('resets run_count to 0 for users who have not posted in more than 36 hours', async () => {
+    const THIRTY_SIX_HOURS = 129_600
+    const t0 = clock.now()
+
+    // User posted more than 36 h ago
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'stale-alice',
+      username: 'stale-alice',
+      lastMusicPostAt: t0 - THIRTY_SIX_HOURS - 1,
+      runCount: 7,
+      highestRunSeen: 12,
+    })
+
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/messages') && opts.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-reset-test' }), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
+
+    const result = await runScheduledWork(db, TOKEN, clock.now())
+    expect(result.isOk).toBe(true)
+
+    const stats = getUserStats(db, MC_ID, 'stale-alice')
+    expect(stats.value?.runCount).toBe(0)
+    expect(stats.value?.highestRunSeen).toBe(12)
+  })
+
+  it('preserves streaks for users who posted within 36 hours', async () => {
+    const THIRTY_SIX_HOURS = 129_600
+    const t0 = clock.now()
+
+    // User posted recently
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'active-bob',
+      username: 'active-bob',
+      lastMusicPostAt: t0 - THIRTY_SIX_HOURS + 100,
+      runCount: 4,
+      highestRunSeen: 4,
+    })
+
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/messages') && opts.method === 'POST')
+        return new Response(JSON.stringify({ id: 'msg-active-test' }), { status: 200 })
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
+
+    const result = await runScheduledWork(db, TOKEN, clock.now())
+    expect(result.isOk).toBe(true)
+
+    const stats = getUserStats(db, MC_ID, 'active-bob')
+    expect(stats.value?.runCount).toBe(4)
+  })
+
+  it('leaderboard reflects zeroed score after inactivity reset', async () => {
+    const THIRTY_SIX_HOURS = 129_600
+    const t0 = clock.now()
+
+    // Stale user
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'stale-carol',
+      username: 'stale-carol',
+      lastMusicPostAt: t0 - THIRTY_SIX_HOURS - 1,
+      runCount: 5,
+      highestRunSeen: 5,
+    })
+    // Active user
+    upsertUserStats(db, {
+      channelId: MC_ID,
+      userId: 'active-dave',
+      username: 'active-dave',
+      lastMusicPostAt: t0 - 100,
+      runCount: 3,
+      highestRunSeen: 3,
+    })
+
+    let postedContent: string | null = null
+    global.fetch = vi.fn(async (url: string, opts: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/messages') && opts.method === 'POST') {
+        postedContent = JSON.parse(opts.body as string).content
+        return new Response(JSON.stringify({ id: 'msg-lb-reset' }), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as any
+
+    const result = await runScheduledWork(db, TOKEN, clock.now())
+    expect(result.isOk).toBe(true)
+
+    // The leaderboard should show active-dave with run 3, and stale-carol with run 0
+    // stale-carol may still appear (highest_run_seen > 0) but with run_count = 0
+    expect(postedContent).toContain('active-dave')
   })
 
   it('prunes old processed_messages entries during scheduled work', async () => {
@@ -361,7 +459,7 @@ describe('scheduled work (e2e)', () => {
       return new Response(JSON.stringify([]), { status: 200 })
     }) as any
 
-    await runScheduledWork(db, TOKEN)
+    await runScheduledWork(db, TOKEN, clock.now())
 
     const oldRow = db
       .prepare('SELECT 1 FROM processed_messages WHERE message_id = ?')

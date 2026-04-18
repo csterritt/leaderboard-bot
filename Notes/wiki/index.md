@@ -56,7 +56,7 @@
 - **[tests-signature.md](tests-signature.md)** — Tests for `utils/signature.ts`
 - **[tests-permissions.md](tests-permissions.md)** — Tests for `utils/permissions.ts`
 - **[tests-db-helpers.md](tests-db-helpers.md)** — Tests for `utils/db-helpers.ts`
-- **[tests-queries.md](tests-queries.md)** — Tests for `db/queries.ts` (37 tests)
+- **[tests-queries.md](tests-queries.md)** — Tests for `db/queries.ts` (44 tests)
 - **[tests-tracker.md](tests-tracker.md)** — Tests for `services/tracker.ts` (25 tests)
 - **[tests-processor.md](tests-processor.md)** — Tests for `services/processor.ts` (17 tests)
 - **[tests-leaderboard.md](tests-leaderboard.md)** — Tests for `services/leaderboard.ts` (11 tests)
@@ -64,7 +64,7 @@
 - **[tests-recovery.md](tests-recovery.md)** — Tests for `services/recovery.ts` (11 tests)
 - **[tests-gateway.md](tests-gateway.md)** — Tests for `handlers/gateway.ts` (5 tests)
 - **[tests-interactions.md](tests-interactions.md)** — Tests for `handlers/interactions.ts` (38 tests)
-- **[tests-scheduled.md](tests-scheduled.md)** — Tests for `handlers/scheduled.ts` (11 tests)
+- **[tests-scheduled.md](tests-scheduled.md)** — Tests for `handlers/scheduled.ts` (17 tests)
 - **[tests-shutdown.md](tests-shutdown.md)** — Tests for `utils/shutdown.ts` (8 tests)
 - **[tests-index.md](tests-index.md)** — Integration tests for `src/index.ts` (2 tests)
 - **[tests-unit.md](tests-unit.md)** — Unit test documentation
@@ -74,6 +74,6 @@
 - **[e2e-clock.md](e2e-clock.md)** — `e2e-tests/utils/clock.test.ts`: 9 tests for the clock facility
 - **[e2e-streaks.md](e2e-streaks.md)** — `e2e-tests/streaks/streak-accumulation.test.ts`: 11 e2e tests for streak accumulation pipeline
 - **[e2e-recovery.md](e2e-recovery.md)** — `e2e-tests/recovery/recovery-pipeline.test.ts`: 8 e2e tests for the recovery pipeline
-- **[e2e-scheduled.md](e2e-scheduled.md)** — `e2e-tests/scheduled/scheduled-work.test.ts`: 8 e2e tests for the scheduled work cycle
+- **[e2e-scheduled.md](e2e-scheduled.md)** — `e2e-tests/scheduled/scheduled-work.test.ts`: 11 e2e tests for the scheduled work cycle
 - **[e2e-interactions.md](e2e-interactions.md)** — `e2e-tests/interactions/slash-commands.test.ts`: 19 e2e tests for slash command interactions
 - **[e2e-tests.md](e2e-tests.md)** — E2E test documentation

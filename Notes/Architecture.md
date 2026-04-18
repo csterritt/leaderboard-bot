@@ -20,7 +20,7 @@ Slash commands are handled through Discord Interactions over HTTP, while message
 - **Runtime**: Bun
 - **Gateway Layer**: discord.js (handles gateway lifecycle)
 - **HTTP Interface**: Discord Interactions endpoint for slash commands
-- **Database**: better-sqlite3 (synchronous)
+- **Database**: better-sqlite3 (synchronous, WAL journal mode)
 - **Language**: TypeScript
 - **Discord Integration**: discord.js + Discord REST API + Discord Interactions
 
@@ -270,7 +270,13 @@ Hourly Timer → runScheduledWork
     ↓
 1. Recover all monitored channels
     ↓
-2. For each leaderboard_channels entry:
+2. Reset inactive streaks
+   └─ SET run_count = 0 for all user_stats rows where
+      last_music_post_at is non-null and more than 36 hours ago
+      (uses THIRTY_SIX_HOURS_SECS constant and the clock facility)
+   └─ highest_run_seen is preserved — it records the all-time best
+    ↓
+3. For each leaderboard_channels entry:
     ├─ Query all monitored_channels linked to this leaderboard channel (may be multiple)
     ├─ For each linked monitored channel, query user_stats and format an individual section
     ├─ Concatenate all sections into one message
@@ -284,7 +290,7 @@ Hourly Timer → runScheduledWork
     │   └─ UPSERT leaderboard_posts(channel_id, message_id, content_hash, posted_at)
     └─ Continue to the next leaderboard channel
     ↓
-3. Prune processed_messages rows older than 14 days
+4. Prune processed_messages rows older than 14 days
 ```
 
 Each configured leaderboard channel is tracked independently. There is no single global leaderboard channel.
@@ -345,6 +351,21 @@ When deleting a previous leaderboard message:
 ### Content Hashing
 
 Leaderboard content is hashed using **FNV-1a** (fast, non-cryptographic) to detect changes. Only post a new message when the hash differs from the stored `content_hash` in `leaderboard_posts`.
+
+### WAL Journal Mode
+
+The database runs in **WAL (Write-Ahead Logging)** mode, enabled at startup with `PRAGMA journal_mode = WAL` before any other operations. WAL improves concurrent read performance and reduces write contention compared to the default rollback journal.
+
+### Inactivity Reset
+
+During each scheduled work cycle, **after recovery and before leaderboard posting**, the bot resets streaks for inactive users:
+
+- Any `user_stats` row where `last_music_post_at` is non-null and more than 36 hours before the current time has its `run_count` set to 0.
+- `highest_run_seen` is **not** modified — it preserves the user's all-time best streak.
+- The 36-hour threshold reuses `THIRTY_SIX_HOURS_SECS` from `constants.ts`.
+- The current time comes from the clock facility (`utils/clock.ts`), making the logic testable.
+
+This ensures leaderboards reflect only active streaks. A user whose streak was already reset by the normal posting flow (delta > 36 h → `run_count = 1` on next post) is unaffected because their `run_count` is already based on the fresh post.
 
 ### Discord API Rate Limiting
 

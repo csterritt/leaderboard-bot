@@ -16,7 +16,8 @@ Slash commands are handled through Discord Interactions over HTTP, while message
 - Support slash-command-based channel configuration
 - Recover missed messages through backfill processing
 - Prevent double processing through message-level idempotency
-- Persist data locally with SQLite via `better-sqlite3`
+- Persist data locally with SQLite via `better-sqlite3` (WAL journal mode)
+- Reset inactive user streaks automatically (score set to 0 after 36 hours of no posts)
 
 ## Tech Stack
 
@@ -24,7 +25,7 @@ Slash commands are handled through Discord Interactions over HTTP, while message
 - **Language**: TypeScript
 - **Gateway Layer**: `discord.js`
 - **HTTP Interface**: Discord Interactions endpoint
-- **Database**: `better-sqlite3`
+- **Database**: `better-sqlite3` (WAL journal mode)
 - **Discord Integration**: `discord.js` + Discord REST API + Discord Interactions
 
 ## How It Works
@@ -54,6 +55,7 @@ The bot uses Discord message timestamps for all streak calculations.
 - **More than 36 hours since the last tracked post**: reset to `run_count = 1`
 - **More than 8 hours and up to 36 hours since the last tracked post**: increment the streak
 - **8 hours or less since the last tracked post**: do not increment the streak
+- **Hourly inactivity reset**: if a user has not posted in more than 36 hours, their `run_count` is set to 0 (their `highest_run_seen` is preserved)
 
 `highest_run_seen` updates whenever the current active streak exceeds the user's best streak so far.
 
@@ -69,8 +71,9 @@ Music uploads are detected using attachment metadata.
 The bot runs scheduled work every hour to:
 
 1. recover missed messages for monitored channels
-2. generate and post leaderboard updates
-3. prune old `processed_messages` rows
+2. reset streaks for inactive users (set `run_count` to 0 when `last_music_post_at` is more than 36 hours ago)
+3. generate and post leaderboard updates
+4. prune old `processed_messages` rows
 
 Leaderboard content is hashed so unchanged leaderboards are not reposted.
 

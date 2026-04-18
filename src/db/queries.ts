@@ -400,3 +400,19 @@ const pruneProcessedMessagesActual = (db: Database, thresholdDays: number): Resu
 
 export const pruneProcessedMessages = (db: Database, thresholdDays: number): Result<void, Error> =>
   withRetry('pruneProcessedMessages', () => pruneProcessedMessagesActual(db, thresholdDays))
+
+// ─── 2.9 resetInactiveStreaks ───────────────────────────────────────────────
+
+const resetInactiveStreaksActual = (db: Database, nowUnixSecs: number): Result<void, Error> =>
+  toResult(() => {
+    db.prepare(`
+      UPDATE user_stats
+      SET run_count = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE last_music_post_at IS NOT NULL
+        AND last_music_post_at < ?
+        AND run_count > 0
+    `).run(nowUnixSecs - 129_600)
+  })
+
+export const resetInactiveStreaks = (db: Database, nowUnixSecs: number): Result<void, Error> =>
+  withRetry('resetInactiveStreaks', () => resetInactiveStreaksActual(db, nowUnixSecs))
